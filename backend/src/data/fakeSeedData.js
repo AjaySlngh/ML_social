@@ -72,7 +72,7 @@ function generateFakePosts() {
     {
       platform: 'x',
       externalPostId: 'x-post-001',
-      accountName: 'MigaLabsHQ',
+      accountName: 'MigaLabs',
       content: 'Post-level analytics trends matter more than one-day spikes.',
       isReply: false,
       publishedAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 9),
@@ -87,7 +87,7 @@ function generateFakePosts() {
     {
       platform: 'x',
       externalPostId: 'x-post-002',
-      accountName: 'MigaLabsHQ',
+      accountName: 'MigaLabs',
       content: 'Which metric predicts campaign outcomes best? We are testing.',
       isReply: true,
       publishedAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 6),
