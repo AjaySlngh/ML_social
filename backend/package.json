@@ -6,7 +6,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "seed": "node src/scripts/seedFakeData.js"
+    "seed": "node src/scripts/seedFakeData.js",
+    "sync:twitter": "node src/scripts/syncTwitterHistory.js"
   },
   "keywords": [],
   "author": "",

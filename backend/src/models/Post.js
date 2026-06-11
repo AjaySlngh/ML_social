@@ -16,6 +16,18 @@ const postSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    source: {
+      type: String,
+      enum: ['seed', 'twitterapi'],
+      required: true,
+      default: 'seed',
+      index: true,
+    },
+    accountHandle: {
+      type: String,
+      default: '',
+      index: true,
+    },
     content: {
       type: String,
       required: true,
@@ -29,10 +41,27 @@ const postSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    trackingEnabled: {
+      type: Boolean,
+      required: true,
+      default: true,
+      index: true,
+    },
+    trackingDisabledAt: {
+      type: Date,
+      default: null,
+    },
+    lastSeenInSourceAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+postSchema.index({ platform: 1, source: 1, accountHandle: 1, publishedAt: -1 });
 
 module.exports = mongoose.model('Post', postSchema);

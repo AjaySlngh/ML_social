@@ -9,6 +9,7 @@ const connectToDatabase = require('./config/db');
 const Post = require('./models/Post');
 const MetricSnapshot = require('./models/MetricSnapshot');
 const { twitterApiGet } = require('./services/twitterApi');
+const { syncTwitterHistory } = require('./services/twitterSync');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -114,6 +115,35 @@ app.get('/api/twitter/user/last_tweets', async (req, res) => {
 	} catch (error) {
 		res.status(error.status || 500).json({
 			error: 'Failed to fetch Twitter user last tweets',
+			details: error.message,
+			upstream: error.upstream || null,
+		});
+	}
+});
+
+app.post('/api/twitter/sync', async (req, res) => {
+	try {
+		const bodyHandles = Array.isArray(req.body?.handles) ? req.body.handles : [];
+		const envHandles = String(process.env.TWITTER_SYNC_USERS || '')
+			.split(',')
+			.map((handle) => handle.trim())
+			.filter(Boolean);
+		const handles = bodyHandles.length > 0 ? bodyHandles : envHandles;
+
+		if (handles.length === 0) {
+			return res.status(400).json({
+				error: 'No handles provided. Set TWITTER_SYNC_USERS or pass { handles: [...] } in request body.',
+			});
+		}
+
+		const trackingWindowDays = Number(
+			req.body?.trackingWindowDays || process.env.TWITTER_TRACKING_WINDOW_DAYS || 120
+		);
+		const summary = await syncTwitterHistory({ handles, trackingWindowDays });
+		return res.json(summary);
+	} catch (error) {
+		return res.status(error.status || 500).json({
+			error: 'Failed to sync Twitter history',
 			details: error.message,
 			upstream: error.upstream || null,
 		});
