@@ -8,6 +8,42 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function normalizeHandleInput(input) {
+  const raw = String(input || '').trim();
+  if (!raw) {
+    return '';
+  }
+
+  const withoutUrl = raw
+    .replace(/^https?:\/\/(www\.)?x\.com\//i, '')
+    .replace(/^https?:\/\/(www\.)?twitter\.com\//i, '');
+
+  return withoutUrl.replace(/^@/, '').split('/')[0].trim();
+}
+
+function buildUserLookupQueries(handleInput) {
+  const handle = normalizeHandleInput(handleInput);
+  if (!handle) {
+    return [];
+  }
+
+  const isNumericId = /^\d+$/.test(handle);
+  if (isNumericId) {
+    return [
+      { userId: handle },
+      { user_id: handle },
+      { id: handle },
+    ];
+  }
+
+  return [
+    { userName: handle },
+    { username: handle },
+    { screen_name: handle },
+    { userName: `@${handle}` },
+  ];
+}
+
 function pickFirstObject(payload) {
   if (!payload) {
     return null;
@@ -112,49 +148,48 @@ function normalizeTweet(rawTweet) {
   };
 }
 
-async function fetchUserInfoWithFallback(handle) {
-  const queries = [{ screen_name: handle }, { username: handle }, { userName: handle }];
+async function fetchUserInfo(handleInput) {
+  const queries = buildUserLookupQueries(handleInput);
+  const attempts = [];
 
   for (const query of queries) {
     try {
       const payload = await twitterApiGet('/twitter/user/info', query);
       const user = extractUserInfo(payload);
       if (user) {
-        return user;
+        return { user, queryUsed: query };
       }
-    } catch (_error) {
-      // Try the next query key variant.
+      attempts.push({ query, message: 'Response did not include a recognizable user object' });
+    } catch (error) {
+      attempts.push({ query, message: error.message, upstream: error.upstream || null });
     }
   }
 
-  return {
-    accountHandle: handle,
-    accountName: handle,
-    followersCount: 0,
-    followingCount: 0,
-    tweetCount: 0,
-    listedCount: 0,
-    profileVisitsCount: null,
-    raw: null,
-  };
+  const error = new Error(`Unable to resolve user for input "${handleInput}"`);
+  error.attempts = attempts;
+  throw error;
 }
 
-async function fetchLastTweetsWithFallback(handle) {
-  const queries = [{ screen_name: handle }, { username: handle }, { userName: handle }];
+async function fetchLastTweets(handleInput) {
+  const queries = buildUserLookupQueries(handleInput);
+  const attempts = [];
 
   for (const query of queries) {
     try {
       const payload = await twitterApiGet('/twitter/user/last_tweets', query);
       const tweets = extractTweets(payload);
       if (tweets.length > 0) {
-        return tweets;
+        return { tweets, queryUsed: query };
       }
-    } catch (_error) {
-      // Try the next query key variant.
+      attempts.push({ query, message: 'Response returned zero tweets' });
+    } catch (error) {
+      attempts.push({ query, message: error.message, upstream: error.upstream || null });
     }
   }
 
-  return [];
+  const error = new Error(`Unable to fetch tweets for input "${handleInput}"`);
+  error.attempts = attempts;
+  throw error;
 }
 
 async function upsertTweetHistory({ handle, collectedAt, trackingWindowDays, accountInfo, rawTweets }) {
@@ -244,7 +279,7 @@ async function syncTwitterHistory({ handles, trackingWindowDays = 120 }) {
   const uniqueHandles = Array.from(
     new Set(
       handles
-        .map((handle) => String(handle || '').trim().replace(/^@/, '').toLowerCase())
+        .map((handle) => normalizeHandleInput(handle))
         .filter(Boolean)
     )
   );
@@ -254,43 +289,61 @@ async function syncTwitterHistory({ handles, trackingWindowDays = 120 }) {
     handles: uniqueHandles,
     trackingWindowDays,
     usersProcessed: 0,
+    usersFailed: 0,
     postsUpserted: 0,
     snapshotsInserted: 0,
     results: [],
   };
 
   for (const handle of uniqueHandles) {
-    const accountInfo = await fetchUserInfoWithFallback(handle);
+    try {
+      const { user: accountInfo, queryUsed: userQueryUsed } = await fetchUserInfo(handle);
 
-    await TwitterAccountSnapshot.updateOne(
-      { accountHandle: accountInfo.accountHandle || handle, collectedAt },
-      {
-        $set: {
-          accountName: accountInfo.accountName || handle,
-          followersCount: accountInfo.followersCount,
-          followingCount: accountInfo.followingCount,
-          tweetCount: accountInfo.tweetCount,
-          listedCount: accountInfo.listedCount,
-          profileVisitsCount: accountInfo.profileVisitsCount,
-          raw: accountInfo.raw,
+      await TwitterAccountSnapshot.updateOne(
+        { accountHandle: accountInfo.accountHandle || handle, collectedAt },
+        {
+          $set: {
+            accountName: accountInfo.accountName || handle,
+            followersCount: accountInfo.followersCount,
+            followingCount: accountInfo.followingCount,
+            tweetCount: accountInfo.tweetCount,
+            listedCount: accountInfo.listedCount,
+            profileVisitsCount: accountInfo.profileVisitsCount,
+            raw: accountInfo.raw,
+          },
         },
-      },
-      { upsert: true }
-    );
+        { upsert: true }
+      );
 
-    const rawTweets = await fetchLastTweetsWithFallback(accountInfo.accountHandle || handle);
-    const result = await upsertTweetHistory({
-      handle,
-      collectedAt,
-      trackingWindowDays,
-      accountInfo,
-      rawTweets,
-    });
+      const { tweets: rawTweets, queryUsed: tweetsQueryUsed } = await fetchLastTweets(
+        accountInfo.accountHandle || handle
+      );
+      const result = await upsertTweetHistory({
+        handle,
+        collectedAt,
+        trackingWindowDays,
+        accountInfo,
+        rawTweets,
+      });
 
-    summary.usersProcessed += 1;
-    summary.postsUpserted += result.upsertedPosts;
-    summary.snapshotsInserted += result.insertedSnapshots;
-    summary.results.push(result);
+      summary.usersProcessed += 1;
+      summary.postsUpserted += result.upsertedPosts;
+      summary.snapshotsInserted += result.insertedSnapshots;
+      summary.results.push({
+        ...result,
+        status: 'ok',
+        userQueryUsed,
+        tweetsQueryUsed,
+      });
+    } catch (error) {
+      summary.usersFailed += 1;
+      summary.results.push({
+        handle,
+        status: 'error',
+        message: error.message,
+        attempts: error.attempts || [],
+      });
+    }
   }
 
   return summary;
