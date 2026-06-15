@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Area,
   AreaChart,
@@ -57,6 +57,7 @@ type EnrichedPoint = TimeseriesPoint & {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000'
 const WEEKDAY_ORDER = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const POSTS_PER_PAGE = 6
 type Page = 'insights' | 'linkedin' | 'x'
 
 function App() {
@@ -67,8 +68,13 @@ function App() {
     linkedin: '',
     x: '',
   })
+  const [postPageByPlatform, setPostPageByPlatform] = useState<Record<'linkedin' | 'x', number>>({
+    linkedin: 1,
+    x: 1,
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const analyticsPanelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     async function loadDashboard() {
@@ -169,6 +175,15 @@ function App() {
     () => (activePlatform ? posts.filter((post) => post.platform === activePlatform) : []),
     [posts, activePlatform]
   )
+
+  const currentPostPage = activePlatform ? postPageByPlatform[activePlatform] : 1
+  const totalPostPages = Math.max(1, Math.ceil(platformPosts.length / POSTS_PER_PAGE))
+  const clampedPostPage = Math.min(currentPostPage, totalPostPages)
+
+  const paginatedPosts = useMemo(() => {
+    const startIndex = (clampedPostPage - 1) * POSTS_PER_PAGE
+    return platformPosts.slice(startIndex, startIndex + POSTS_PER_PAGE)
+  }, [platformPosts, clampedPostPage])
 
   const selectedPostId = activePlatform ? selectedPostByPlatform[activePlatform] : ''
   const selectedPost = useMemo(
@@ -620,11 +635,13 @@ function App() {
         <article className="panel post-panel">
           <div className="panel-title-row">
             <h2>Posts</h2>
-            <span>{platformPosts.length} records</span>
+            <span>
+              {platformPosts.length} records | Page {clampedPostPage} of {totalPostPages}
+            </span>
           </div>
           {activePlatform === 'x' ? (
             <div className="compact-post-list" role="list" aria-label="X posts">
-              {platformPosts.map((post) => {
+              {paginatedPosts.map((post) => {
                 const postSeries = allSeriesByPost[post._id] ?? []
                 const latest = postSeries.length > 0 ? enrichSeries([postSeries[postSeries.length - 1]])[0] : null
 
@@ -633,10 +650,17 @@ function App() {
                     key={post._id}
                     type="button"
                     className={`compact-post-card ${selectedPostId === post._id ? 'is-selected' : ''}`}
-                    onClick={() =>
-                      activePlatform &&
+                    onClick={() => {
+                      if (!activePlatform) {
+                        return
+                      }
                       setSelectedPostByPlatform((prev) => ({ ...prev, [activePlatform]: post._id }))
-                    }
+                      if (window.matchMedia('(max-width: 1024px)').matches) {
+                        requestAnimationFrame(() => {
+                          analyticsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        })
+                      }
+                    }}
                   >
                     <div className="compact-post-meta">
                       <span>{formatDate(post.publishedAt)}</span>
@@ -664,14 +688,21 @@ function App() {
                   </tr>
                 </thead>
                 <tbody>
-                  {platformPosts.map((post) => (
+                  {paginatedPosts.map((post) => (
                     <tr
                       key={post._id}
                       className={selectedPostId === post._id ? 'is-selected' : ''}
-                      onClick={() =>
-                        activePlatform &&
+                      onClick={() => {
+                        if (!activePlatform) {
+                          return
+                        }
                         setSelectedPostByPlatform((prev) => ({ ...prev, [activePlatform]: post._id }))
-                      }
+                        if (window.matchMedia('(max-width: 1024px)').matches) {
+                          requestAnimationFrame(() => {
+                            analyticsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                          })
+                        }
+                      }}
                     >
                       <td>{post.platform.toUpperCase()}</td>
                       <td>{post.accountName}</td>
@@ -683,104 +714,137 @@ function App() {
               </table>
             </div>
           )}
+          <div className="posts-pagination" aria-label="Posts pagination controls">
+            <button
+              type="button"
+              className="pagination-button"
+              disabled={clampedPostPage <= 1 || !activePlatform}
+              onClick={() => {
+                if (!activePlatform) {
+                  return
+                }
+                setPostPageByPlatform((prev) => ({ ...prev, [activePlatform]: Math.max(1, clampedPostPage - 1) }))
+              }}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="pagination-button"
+              disabled={clampedPostPage >= totalPostPages || !activePlatform}
+              onClick={() => {
+                if (!activePlatform) {
+                  return
+                }
+                setPostPageByPlatform((prev) => ({
+                  ...prev,
+                  [activePlatform]: Math.min(totalPostPages, clampedPostPage + 1),
+                }))
+              }}
+            >
+              Next
+            </button>
+          </div>
         </article>
 
-        <article className="panel chart-panel">
-          <div className="panel-title-row">
-            <h2>Engagement Over Time</h2>
-            <span>{selectedPost?.externalPostId ?? 'No post selected'}</span>
-          </div>
+        <div className="analytics-right-column" ref={analyticsPanelRef}>
+          <article className="panel chart-panel">
+            <div className="panel-title-row">
+              <h2>Engagement Over Time</h2>
+              <span>{selectedPost?.externalPostId ?? 'No post selected'}</span>
+            </div>
 
-          <p className="selected-content">{selectedPost?.content ?? 'Select a post from the table.'}</p>
+            <p className="selected-content">{selectedPost?.content ?? 'Select a post from the table.'}</p>
 
-          <div className="chart-wrap">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={selectedSeries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
-                <XAxis dataKey="createdAt" tickFormatter={formatDate} />
-                <YAxis />
-                <Tooltip
-                  labelFormatter={(value) => formatDate(String(value))}
-                  formatter={(value) => formatNumber(Number(value ?? 0))}
-                />
-                <Legend />
-                <Bar dataKey="retweetCount" name="Retweets" fill="#5590f3" barSize={14} />
-                <Line type="monotone" dataKey="likeCount" name="Likes" stroke="#fd8b5d" strokeWidth={2.5} dot={false} />
-                <Line type="monotone" dataKey="replyCount" name="Replies" stroke="#73c476" strokeWidth={2.5} dot={false} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
+            <div className="chart-wrap">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={selectedSeries}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
+                  <XAxis dataKey="createdAt" tickFormatter={formatDate} />
+                  <YAxis />
+                  <Tooltip
+                    labelFormatter={(value) => formatDate(String(value))}
+                    formatter={(value) => formatNumber(Number(value ?? 0))}
+                  />
+                  <Legend />
+                  <Bar dataKey="retweetCount" name="Retweets" fill="#5590f3" barSize={14} />
+                  <Line type="monotone" dataKey="likeCount" name="Likes" stroke="#fd8b5d" strokeWidth={2.5} dot={false} />
+                  <Line type="monotone" dataKey="replyCount" name="Replies" stroke="#73c476" strokeWidth={2.5} dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
 
-          {error && <p className="error-text">{error}</p>}
-        </article>
+            {error && <p className="error-text">{error}</p>}
+          </article>
+
+          <article className="panel">
+            <div className="panel-title-row">
+              <h2>Views vs Engagement Rate</h2>
+              <span>per day</span>
+            </div>
+            <div className="chart-wrap compact">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={selectedSeries}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
+                  <XAxis dataKey="createdAt" tickFormatter={formatDate} />
+                  <YAxis yAxisId="left" />
+                  <YAxis yAxisId="right" orientation="right" unit="%" domain={[0, 'auto']} />
+                  <Tooltip
+                    labelFormatter={(value) => formatDate(String(value))}
+                    formatter={(value, name) => {
+                      if (name === 'engagementRate') {
+                        return `${Number(value ?? 0).toFixed(2)}%`
+                      }
+                      return formatNumber(Number(value ?? 0))
+                    }}
+                  />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="viewCount"
+                    name="Views"
+                    yAxisId="left"
+                    stroke="#00aad0"
+                    fill="#0e3046"
+                    fillOpacity={0.55}
+                    strokeWidth={2.25}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="engagementRate"
+                    name="Engagement Rate"
+                    yAxisId="right"
+                    stroke="#8c79e0"
+                    fill="#2f2f4d"
+                    fillOpacity={0.55}
+                    strokeWidth={2.5}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </article>
+
+          <article className="panel">
+            <div className="panel-title-row">
+              <h2>Posts by Day of Week</h2>
+              <span>avg likes</span>
+            </div>
+            <div className="chart-wrap compact">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={postsByWeekday}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
+                  <XAxis dataKey="day" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => formatNumber(Number(value ?? 0))} />
+                  <Bar dataKey="avgLikeCount" name="Avg Likes" fill="#00aad0" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </article>
+        </div>
       </section>
 
       <section className="chart-grid-secondary">
-        <article className="panel">
-          <div className="panel-title-row">
-            <h2>Views vs Engagement Rate</h2>
-            <span>per day</span>
-          </div>
-          <div className="chart-wrap compact">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={selectedSeries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
-                <XAxis dataKey="createdAt" tickFormatter={formatDate} />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" unit="%" domain={[0, 'auto']} />
-                <Tooltip
-                  labelFormatter={(value) => formatDate(String(value))}
-                  formatter={(value, name) => {
-                    if (name === 'engagementRate') {
-                      return `${Number(value ?? 0).toFixed(2)}%`
-                    }
-                    return formatNumber(Number(value ?? 0))
-                  }}
-                />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey="viewCount"
-                  name="Views"
-                  yAxisId="left"
-                  stroke="#00aad0"
-                  fill="#0e3046"
-                  fillOpacity={0.55}
-                  strokeWidth={2.25}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="engagementRate"
-                  name="Engagement Rate"
-                  yAxisId="right"
-                  stroke="#8c79e0"
-                  fill="#2f2f4d"
-                  fillOpacity={0.55}
-                  strokeWidth={2.5}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </article>
-
-        <article className="panel">
-          <div className="panel-title-row">
-            <h2>Posts by Day of Week</h2>
-            <span>avg likes</span>
-          </div>
-          <div className="chart-wrap compact">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={postsByWeekday}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
-                <XAxis dataKey="day" />
-                <YAxis />
-                <Tooltip formatter={(value) => formatNumber(Number(value ?? 0))} />
-                <Bar dataKey="avgLikeCount" name="Avg Likes" fill="#00aad0" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </article>
-
         <article className="panel">
           <div className="panel-title-row">
             <h2>Engagement Mix Radar</h2>
