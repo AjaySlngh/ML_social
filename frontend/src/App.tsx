@@ -610,7 +610,7 @@ function App() {
             <article className="metric-card">
               <h2>Profile Visits</h2>
               <p>{xCardMetrics.profileVisits === null ? '--' : formatNumber(xCardMetrics.profileVisits)}</p>
-              <small className="metric-subtext">This is weird I'll do it later</small>
+              <small className="metric-subtext">Unavailable until API integration</small>
             </article>
           </>
         )}
@@ -622,35 +622,67 @@ function App() {
             <h2>Posts</h2>
             <span>{platformPosts.length} records</span>
           </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Platform</th>
-                  <th>Account</th>
-                  <th>Content</th>
-                  <th>Published</th>
-                </tr>
-              </thead>
-              <tbody>
-                {platformPosts.map((post) => (
-                  <tr
+          {activePlatform === 'x' ? (
+            <div className="compact-post-list" role="list" aria-label="X posts">
+              {platformPosts.map((post) => {
+                const postSeries = allSeriesByPost[post._id] ?? []
+                const latest = postSeries.length > 0 ? enrichSeries([postSeries[postSeries.length - 1]])[0] : null
+
+                return (
+                  <button
                     key={post._id}
-                    className={selectedPostId === post._id ? 'is-selected' : ''}
+                    type="button"
+                    className={`compact-post-card ${selectedPostId === post._id ? 'is-selected' : ''}`}
                     onClick={() =>
                       activePlatform &&
                       setSelectedPostByPlatform((prev) => ({ ...prev, [activePlatform]: post._id }))
                     }
                   >
-                    <td>{post.platform.toUpperCase()}</td>
-                    <td>{post.accountName}</td>
-                    <td>{post.content}</td>
-                    <td>{formatDate(post.publishedAt)}</td>
+                    <div className="compact-post-meta">
+                      <span>{formatDate(post.publishedAt)}</span>
+                      <span>{latest ? `${formatNumber(latest.viewCount)} views` : 'No metrics yet'}</span>
+                    </div>
+                    <p className="compact-post-preview">{post.content}</p>
+                    <div className="compact-post-stats" aria-hidden="true">
+                      <span>{latest ? `${formatNumber(latest.likeCount)} likes` : '-- likes'}</span>
+                      <span>{latest ? `${formatNumber(latest.retweetCount)} reposts` : '-- reposts'}</span>
+                      <span>{latest ? `${latest.engagementRate.toFixed(2)}% ER` : '-- ER'}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Platform</th>
+                    <th>Account</th>
+                    <th>Content</th>
+                    <th>Published</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {platformPosts.map((post) => (
+                    <tr
+                      key={post._id}
+                      className={selectedPostId === post._id ? 'is-selected' : ''}
+                      onClick={() =>
+                        activePlatform &&
+                        setSelectedPostByPlatform((prev) => ({ ...prev, [activePlatform]: post._id }))
+                      }
+                    >
+                      <td>{post.platform.toUpperCase()}</td>
+                      <td>{post.accountName}</td>
+                      <td>{post.content}</td>
+                      <td>{formatDate(post.publishedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </article>
 
         <article className="panel chart-panel">
