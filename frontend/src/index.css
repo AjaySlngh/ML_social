@@ -10,7 +10,7 @@
   --signal-blue: #5590f3;
   --signal-cyan: #00aad0;
 
-  font-family: Inter, 'Avenir Next', 'Segoe UI', sans-serif;
+  font-family: Inter, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -44,5 +44,5 @@ p {
 h1,
 h2 {
   color: var(--text-primary);
-  font-family: 'Space Grotesk', Inter, sans-serif;
+  font-family: inherit;
 }
