@@ -5,10 +5,10 @@
   --border: #3d4354;
   --text-primary: #f3f4f6;
   --text-secondary: #a3a3a3;
-  --accent: #e05d38;
-  --accent-soft: #f69f72;
-  --signal-blue: #5590f3;
-  --signal-cyan: #00aad0;
+  --accent: #ff5729;
+  --accent-soft: #ff8a65;
+  --signal-blue: #ff5729;
+  --signal-cyan: #ff5729;
 
   font-family: Inter, sans-serif;
   font-synthesis: none;
