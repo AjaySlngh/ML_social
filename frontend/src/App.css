@@ -38,8 +38,8 @@
 }
 
 .nav-link:hover {
-  background: rgba(85, 144, 243, 0.15);
-  border-color: rgba(85, 144, 243, 0.32);
+  background: rgba(255, 87, 41, 0.40);
+  border-color: rgba(255, 87, 41, 1);
   color: #f8fafc;
 }
 
@@ -47,11 +47,11 @@
   background: linear-gradient(120deg, #e05d38, #f69f72);
   color: #fff;
   border-color: rgba(255, 255, 255, 0.16);
-  box-shadow: 0 6px 14px rgba(224, 93, 56, 0.3);
+  box-shadow: 0 6px 14px rgba(255, 87, 41, 0.3);
 }
 
 .nav-link:focus-visible {
-  outline: 2px solid #5590f3;
+  outline: 2px solid #ff5729;
   outline-offset: 2px;
 }
 
@@ -326,7 +326,7 @@ tbody tr {
 }
 
 tbody tr:hover {
-  background: rgba(85, 144, 243, 0.16);
+  background: rgba(255, 87, 41, 1);
 }
 
 tr.is-selected {
