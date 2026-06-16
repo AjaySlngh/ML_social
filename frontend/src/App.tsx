@@ -167,7 +167,7 @@ function App() {
     })
   }
 
-  const mixColors = ['#da6b61', '#73c476', '#5590f3', '#e1b75c']
+  const mixColors = ['#da6b61', '#73c476', '#ff5729', '#ff5729']
 
   const activePlatform = activePage === 'linkedin' || activePage === 'x' ? activePage : null
 

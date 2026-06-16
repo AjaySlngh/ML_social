@@ -231,18 +231,18 @@
 .compact-post-card:hover,
 .compact-post-card:focus-visible {
   transform: translateY(-1px);
-  border-color: rgba(85, 144, 243, 0.4);
+  border-color: rgba(255, 87, 41, 0.4);
   box-shadow: 0 10px 18px rgba(2, 6, 23, 0.24);
 }
 
 .compact-post-card.is-selected {
-  border-color: rgba(224, 93, 56, 0.55);
+  border-color: rgba(255, 87, 41, 0.55);
   background: linear-gradient(150deg, rgba(52, 40, 35, 0.96), rgba(31, 30, 43, 0.96));
-  box-shadow: 0 12px 22px rgba(224, 93, 56, 0.12);
+  box-shadow: 0 12px 22px rgba(255, 87, 41, 0.12);
 }
 
 .compact-post-card:focus-visible {
-  outline: 2px solid #5590f3;
+  outline: 2px solid #ff5729;
   outline-offset: 2px;
 }
 
@@ -291,7 +291,7 @@
 }
 
 .pagination-button:hover:not(:disabled) {
-  border-color: rgba(85, 144, 243, 0.45);
+  border-color: rgba(255, 87, 41, 1);
   color: #ffffff;
 }
 
