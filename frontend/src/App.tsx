@@ -464,24 +464,6 @@ function App() {
     return Array.from(weekMap.values()).sort((a, b) => a.week.localeCompare(b.week))
   }, [platformPosts, allSeriesByPost])
 
-  const replyVsOriginal = useMemo(() => {
-    let replies = 0
-    let originals = 0
-
-    platformPosts.forEach((post) => {
-      if (post.isReply) {
-        replies += 1
-      } else {
-        originals += 1
-      }
-    })
-
-    return [
-      { name: 'Replies', value: replies },
-      { name: 'Original Posts', value: originals },
-    ]
-  }, [platformPosts])
-
   const linkedinCardMetrics = useMemo(() => {
     const clicks = Math.max(0, Math.round(overviewForPage.impressions * 0.07))
     const engagementRate =
@@ -1227,33 +1209,6 @@ function App() {
                 <Bar dataKey="quoteCount" name="Quotes" stackId="eng" fill="#8c79e0" />
                 <Bar dataKey="bookmarkCount" name="Bookmarks" stackId="eng" fill="#e1b75c" />
               </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </article>
-
-        <article className="panel">
-          <div className="panel-title-row">
-            <h2>Reply vs Original Mix</h2>
-            <span>post type split</span>
-          </div>
-          <div className="chart-wrap compact pie">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={replyVsOriginal}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={52}
-                  outerRadius={88}
-                  paddingAngle={4}
-                >
-                  {replyVsOriginal.map((entry, index) => (
-                    <Cell key={entry.name} fill={mixColors[index % mixColors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatNumber(Number(value ?? 0))} />
-                <Legend />
-              </PieChart>
             </ResponsiveContainer>
           </div>
         </article>

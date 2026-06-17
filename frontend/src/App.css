@@ -401,6 +401,35 @@ tr.is-selected {
   gap: 0.4rem;
 }
 
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+.recharts-default-tooltip {
+  background: rgba(28, 36, 51, 0.98) !important;
+  border: 1px solid rgba(255, 87, 41, 0.55) !important;
+  border-radius: 0.85rem !important;
+  box-shadow: 0 14px 30px rgba(2, 6, 23, 0.38) !important;
+  color: #f3f4f6 !important;
+  padding: 0.7rem 0.8rem !important;
+}
+
+.recharts-default-tooltip .recharts-tooltip-label {
+  color: #ffd7cc !important;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.recharts-default-tooltip .recharts-tooltip-item,
+.recharts-default-tooltip .recharts-tooltip-item-name,
+.recharts-default-tooltip .recharts-tooltip-item-value {
+  color: #e5e7eb !important;
+}
+
+.recharts-default-tooltip .recharts-tooltip-item-name {
+  margin-right: 0.4rem;
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;

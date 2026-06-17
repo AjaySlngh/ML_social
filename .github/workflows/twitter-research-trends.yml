@@ -29,6 +29,7 @@ jobs:
       - name: Run Twitter research trends sync
         run: npm run sync:twitter:research
         env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
           TWITTERAPI_API_KEY: ${{ secrets.TWITTERAPI_API_KEY }}
           TWITTERAPI_BASE_URL: https://api.twitterapi.io
           TWITTER_RESEARCH_LIST_ID: ${{ secrets.TWITTER_RESEARCH_LIST_ID }}
