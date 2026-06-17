@@ -8,6 +8,7 @@ const morgan = require('morgan');
 const connectToDatabase = require('./config/db');
 const Post = require('./models/Post');
 const MetricSnapshot = require('./models/MetricSnapshot');
+const TwitterResearchSnapshot = require('./models/TwitterResearchSnapshot');
 const { twitterApiGet } = require('./services/twitterApi');
 const { syncTwitterHistory } = require('./services/twitterSync');
 const { getCryptoTrendAnalysis } = require('./services/twitterResearch');
@@ -144,15 +145,58 @@ app.get('/api/twitter/research/trends', async (req, res) => {
 			});
 		}
 
+		const latestSnapshot = await TwitterResearchSnapshot.findOne({ listId: String(listId).trim() })
+			.sort({ generatedAt: -1 })
+			.lean();
+
+		if (latestSnapshot) {
+			return res.json(latestSnapshot);
+		}
+
 		const windowDays = Number(req.query.windowDays || 7);
 		const topLimit = Number(req.query.topLimit || 12);
 		const result = await getCryptoTrendAnalysis({ listId, windowDays, topLimit });
+		await TwitterResearchSnapshot.create({
+			listId: result.listId,
+			queryUsed: result.queryUsed,
+			window: result.window,
+			fetchedTweets: result.fetchedTweets,
+			analyzedTweets: result.analyzedTweets,
+			topHashtags: result.topHashtags,
+			topKeywords: result.topKeywords,
+			topicBreakdown: result.topicBreakdown,
+			dailyVolume: result.dailyVolume,
+			mostEngagedTweets: result.mostEngagedTweets,
+			generatedAt: new Date(),
+		});
 		return res.json(result);
 	} catch (error) {
 		return res.status(error.status || 500).json({
 			error: 'Failed to analyze Twitter research trends',
 			details: error.message,
 			attempts: error.attempts || [],
+			upstream: error.upstream || null,
+		});
+	}
+});
+
+app.get('/api/twitter/research/latest', async (_req, res) => {
+	try {
+		const latestSnapshot = await TwitterResearchSnapshot.findOne()
+			.sort({ generatedAt: -1 })
+			.lean();
+
+		if (latestSnapshot) {
+			return res.json(latestSnapshot);
+		}
+
+		return res.status(404).json({
+			error: 'No research snapshot available yet',
+		});
+	} catch (error) {
+		return res.status(error.status || 500).json({
+			error: 'Failed to fetch latest Twitter research snapshot',
+			details: error.message,
 			upstream: error.upstream || null,
 		});
 	}

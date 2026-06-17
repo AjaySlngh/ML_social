@@ -97,6 +97,10 @@ type TrendTweet = {
 
 type ResearchTrendsResponse = {
   listId: string
+  queryUsed?: unknown
+  generatedAt?: string
+  createdAt?: string
+  updatedAt?: string
   fetchedTweets: number
   analyzedTweets: number
   topHashtags: TrendTagCount[]
@@ -116,8 +120,34 @@ const WEEKDAY_ORDER = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const POSTS_PER_PAGE = 6
 type Page = 'insights' | 'linkedin' | 'x' | 'research'
 
+function normalizeResearchData(payload: Partial<ResearchTrendsResponse> | null): ResearchTrendsResponse | null {
+  if (!payload) {
+    return null
+  }
+
+  return {
+    listId: String(payload.listId ?? ''),
+    queryUsed: payload.queryUsed,
+    generatedAt: payload.generatedAt,
+    createdAt: payload.createdAt,
+    updatedAt: payload.updatedAt,
+    fetchedTweets: Number(payload.fetchedTweets ?? 0),
+    analyzedTweets: Number(payload.analyzedTweets ?? 0),
+    topHashtags: Array.isArray(payload.topHashtags) ? payload.topHashtags : [],
+    topKeywords: Array.isArray(payload.topKeywords) ? payload.topKeywords : [],
+    topicBreakdown: Array.isArray(payload.topicBreakdown) ? payload.topicBreakdown : [],
+    dailyVolume: Array.isArray(payload.dailyVolume) ? payload.dailyVolume : [],
+    mostEngagedTweets: Array.isArray(payload.mostEngagedTweets) ? payload.mostEngagedTweets : [],
+    window: {
+      days: Number(payload.window?.days ?? 7),
+      from: String(payload.window?.from ?? new Date().toISOString()),
+      to: String(payload.window?.to ?? new Date().toISOString()),
+    },
+  }
+}
+
 function App() {
-  const [activePage, setActivePage] = useState<Page>('insights')
+  const [activePage, setActivePage] = useState<Page>('research')
   const [posts, setPosts] = useState<Post[]>([])
   const [allSeriesByPost, setAllSeriesByPost] = useState<Record<string, TimeseriesPoint[]>>({})
   const [selectedPostByPlatform, setSelectedPostByPlatform] = useState<Record<'linkedin' | 'x', string>>({
@@ -134,6 +164,7 @@ function App() {
   const [researchLoading, setResearchLoading] = useState(false)
   const [researchError, setResearchError] = useState('')
   const analyticsPanelRef = useRef<HTMLDivElement | null>(null)
+  const researchRetryTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     async function loadDashboard() {
@@ -199,10 +230,6 @@ function App() {
   }, [posts])
 
   useEffect(() => {
-    if (activePage !== 'research' || researchData || researchLoading) {
-      return
-    }
-
     let isActive = true
 
     async function loadResearchTrends() {
@@ -211,13 +238,14 @@ function App() {
 
       try {
         const response = await fetch(`${API_BASE_URL}/api/twitter/research/trends`)
+
         if (!response.ok) {
           throw new Error('Unable to load research trend analysis.')
         }
 
         const payload = (await response.json()) as ResearchTrendsResponse
         if (isActive) {
-          setResearchData(payload)
+          setResearchData(normalizeResearchData(payload))
         }
       } catch (loadError) {
         if (isActive) {
@@ -234,8 +262,12 @@ function App() {
 
     return () => {
       isActive = false
+      if (researchRetryTimerRef.current !== null) {
+        window.clearTimeout(researchRetryTimerRef.current)
+        researchRetryTimerRef.current = null
+      }
     }
-  }, [activePage, researchData, researchLoading])
+  }, [])
 
   const formatNumber = (value: number) => new Intl.NumberFormat('en-US').format(value)
 
@@ -653,10 +685,27 @@ function App() {
 
         <article className="panel insights-trends-placeholder">
           <div className="panel-title-row">
-            <h2>Tracking Trends</h2>
-            <span>coming soon</span>
+            <h2>Ethereum Trends</h2>
+            <span>{researchData ? 'latest research' : 'loading'}</span>
           </div>
-          <p className="selected-content">This section will chart rolling movement across LinkedIn and X over time.</p>
+          {researchData ? (
+            <div className="research-insights-summary">
+              <p className="selected-content">
+                {researchData.analyzedTweets} tweets analyzed from list {researchData.listId}.
+              </p>
+              <p className="selected-content">
+                Top topic: {researchData.topicBreakdown[0]?.topic ?? 'No topic found'}
+              </p>
+              <p className="selected-content">
+                Daily volume peak: {Math.max(...researchData.dailyVolume.map((item) => item.tweetCount), 0)} tweets
+              </p>
+              <p className="selected-content">
+                Top keyword: {researchData.topKeywords[0]?.keyword ?? 'No keyword found'}
+              </p>
+            </div>
+          ) : (
+            <p className="selected-content">Loading the latest Ethereum trend snapshot...</p>
+          )}
         </article>
       </section>
     </>
