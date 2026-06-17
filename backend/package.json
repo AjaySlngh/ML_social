@@ -7,7 +7,8 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "seed": "node src/scripts/seedFakeData.js",
-    "sync:twitter": "node src/scripts/syncTwitterHistory.js"
+    "sync:twitter": "node src/scripts/syncTwitterHistory.js",
+    "sync:twitter:research": "node src/scripts/syncTwitterResearchTrends.js"
   },
   "keywords": [],
   "author": "",

@@ -10,6 +10,7 @@ const Post = require('./models/Post');
 const MetricSnapshot = require('./models/MetricSnapshot');
 const { twitterApiGet } = require('./services/twitterApi');
 const { syncTwitterHistory } = require('./services/twitterSync');
+const { getCryptoTrendAnalysis } = require('./services/twitterResearch');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -116,6 +117,42 @@ app.get('/api/twitter/user/last_tweets', async (req, res) => {
 		res.status(error.status || 500).json({
 			error: 'Failed to fetch Twitter user last tweets',
 			details: error.message,
+			upstream: error.upstream || null,
+		});
+	}
+});
+
+app.get('/api/twitter/list/tweets_timeline', async (req, res) => {
+	try {
+		const result = await twitterApiGet('/twitter/list/tweets_timeline', req.query);
+		res.json(result);
+	} catch (error) {
+		res.status(error.status || 500).json({
+			error: 'Failed to fetch Twitter list timeline',
+			details: error.message,
+			upstream: error.upstream || null,
+		});
+	}
+});
+
+app.get('/api/twitter/research/trends', async (req, res) => {
+	try {
+		const listId = req.query.listId || process.env.TWITTER_RESEARCH_LIST_ID;
+		if (!String(listId || '').trim()) {
+			return res.status(400).json({
+				error: 'Missing list ID. Set TWITTER_RESEARCH_LIST_ID or pass ?listId=...',
+			});
+		}
+
+		const windowDays = Number(req.query.windowDays || 7);
+		const topLimit = Number(req.query.topLimit || 12);
+		const result = await getCryptoTrendAnalysis({ listId, windowDays, topLimit });
+		return res.json(result);
+	} catch (error) {
+		return res.status(error.status || 500).json({
+			error: 'Failed to analyze Twitter research trends',
+			details: error.message,
+			attempts: error.attempts || [],
 			upstream: error.upstream || null,
 		});
 	}

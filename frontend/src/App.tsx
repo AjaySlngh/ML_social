@@ -55,10 +55,66 @@ type EnrichedPoint = TimeseriesPoint & {
   engagementRate: number
 }
 
+type TrendTopic = {
+  topic: string
+  mentionCount: number
+  avgEngagementScore: number
+  trendScore: number
+}
+
+type TrendTagCount = {
+  hashtag: string
+  count: number
+}
+
+type TrendKeywordCount = {
+  keyword: string
+  count: number
+}
+
+type TrendDailyVolume = {
+  day: string
+  tweetCount: number
+}
+
+type TrendTweet = {
+  id: string
+  author: string | null
+  publishedAt: string
+  text: string
+  topics: string[]
+  hashtags: string[]
+  engagement: {
+    likes: number
+    replies: number
+    retweets: number
+    quotes: number
+    bookmarks: number
+    impressions: number
+    score: number
+  }
+}
+
+type ResearchTrendsResponse = {
+  listId: string
+  fetchedTweets: number
+  analyzedTweets: number
+  topHashtags: TrendTagCount[]
+  topKeywords: TrendKeywordCount[]
+  topicBreakdown: TrendTopic[]
+  dailyVolume: TrendDailyVolume[]
+  mostEngagedTweets: TrendTweet[]
+  window: {
+    days: number
+    from: string
+    to: string
+  }
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000'
 const WEEKDAY_ORDER = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const POSTS_PER_PAGE = 6
-type Page = 'insights' | 'linkedin' | 'x'
+type Page = 'insights' | 'linkedin' | 'x' | 'research'
 
 function App() {
   const [activePage, setActivePage] = useState<Page>('insights')
@@ -74,6 +130,9 @@ function App() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [researchData, setResearchData] = useState<ResearchTrendsResponse | null>(null)
+  const [researchLoading, setResearchLoading] = useState(false)
+  const [researchError, setResearchError] = useState('')
   const analyticsPanelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -138,6 +197,45 @@ function App() {
 
     loadAllSeries()
   }, [posts])
+
+  useEffect(() => {
+    if (activePage !== 'research' || researchData || researchLoading) {
+      return
+    }
+
+    let isActive = true
+
+    async function loadResearchTrends() {
+      setResearchLoading(true)
+      setResearchError('')
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/twitter/research/trends`)
+        if (!response.ok) {
+          throw new Error('Unable to load research trend analysis.')
+        }
+
+        const payload = (await response.json()) as ResearchTrendsResponse
+        if (isActive) {
+          setResearchData(payload)
+        }
+      } catch (loadError) {
+        if (isActive) {
+          setResearchError(loadError instanceof Error ? loadError.message : 'Unknown error')
+        }
+      } finally {
+        if (isActive) {
+          setResearchLoading(false)
+        }
+      }
+    }
+
+    loadResearchTrends()
+
+    return () => {
+      isActive = false
+    }
+  }, [activePage, researchData, researchLoading])
 
   const formatNumber = (value: number) => new Intl.NumberFormat('en-US').format(value)
 
@@ -564,6 +662,179 @@ function App() {
     </>
   )
 
+  const renderResearch = () => {
+    const trendRows = researchData?.topicBreakdown ?? []
+    const hashtagRows = researchData?.topHashtags ?? []
+    const keywordRows = researchData?.topKeywords ?? []
+    const dailyVolumeRows = researchData?.dailyVolume ?? []
+    const engagedTweets = researchData?.mostEngagedTweets ?? []
+
+    return (
+      <>
+        <header className="hero-panel">
+          <p className="eyebrow">MigaLabs Social Research</p>
+          <h1>Ethereum Trends</h1>
+          <p className="hero-copy">
+            Curated-list analysis for Ethereum conversations over the past week, including topic momentum, engagement,
+            and narrative density.
+          </p>
+        </header>
+
+        <section className="overview-grid" aria-label="Research overview cards">
+          <article className="metric-card">
+            <h2>Analyzed Tweets</h2>
+            <p>{formatNumber(researchData?.analyzedTweets ?? 0)}</p>
+            <small className="metric-subtext">From curated list feed</small>
+          </article>
+          <article className="metric-card">
+            <h2>Window</h2>
+            <p>{researchData?.window?.days ?? 7}d</p>
+            <small className="metric-subtext">
+              {researchData?.window?.from ? `${formatDate(researchData.window.from)} to ${formatDate(researchData.window.to)}` : 'Last 7 days'}
+            </small>
+          </article>
+          <article className="metric-card">
+            <h2>Top ETH Narrative</h2>
+            <p className="metric-post-title">{trendRows[0]?.topic ?? 'No topic found'}</p>
+          </article>
+          <article className="metric-card">
+            <h2>Research List</h2>
+            <p className="metric-post-title">{researchData?.listId ?? '--'}</p>
+          </article>
+        </section>
+
+        <section className="content-grid">
+          <article className="panel">
+            <div className="panel-title-row">
+              <h2>Topic Momentum (Ethereum)</h2>
+              <span>trend score</span>
+            </div>
+            <div className="chart-wrap compact">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={trendRows}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
+                  <XAxis dataKey="topic" hide />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value, name) => {
+                      if (name === 'trendScore') {
+                        return Number(value ?? 0).toFixed(2)
+                      }
+                      return formatNumber(Number(value ?? 0))
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="trendScore" name="Trend Score" fill="#ff5729" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="mentionCount" name="Mentions" fill="#f69f72" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </article>
+
+          <article className="panel">
+            <div className="panel-title-row">
+              <h2>Tweet Volume Over Time</h2>
+              <span>daily count</span>
+            </div>
+            <div className="chart-wrap compact">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dailyVolumeRows}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
+                  <XAxis dataKey="day" tickFormatter={formatDate} />
+                  <YAxis />
+                  <Tooltip
+                    labelFormatter={(value) => formatDate(String(value))}
+                    formatter={(value) => formatNumber(Number(value ?? 0))}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="tweetCount"
+                    name="Tweet Count"
+                    stroke="#ff5729"
+                    fill="#69251a"
+                    fillOpacity={0.55}
+                    strokeWidth={2.25}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </article>
+        </section>
+
+        <section className="chart-grid-secondary">
+          <article className="panel">
+            <div className="panel-title-row">
+              <h2>Top Hashtags</h2>
+              <span>from list tweets</span>
+            </div>
+            <div className="research-chip-list">
+              {hashtagRows.slice(0, 12).map((tag) => (
+                <span key={tag.hashtag} className="research-chip">
+                  #{tag.hashtag} ({formatNumber(tag.count)})
+                </span>
+              ))}
+              {hashtagRows.length === 0 && <p className="selected-content">No hashtags found in the selected window.</p>}
+            </div>
+          </article>
+
+          <article className="panel">
+            <div className="panel-title-row">
+              <h2>Top Keywords</h2>
+              <span>Ethereum narratives</span>
+            </div>
+            <div className="research-chip-list">
+              {keywordRows.slice(0, 12).map((entry) => (
+                <span key={entry.keyword} className="research-chip">
+                  {entry.keyword} ({formatNumber(entry.count)})
+                </span>
+              ))}
+              {keywordRows.length === 0 && <p className="selected-content">No keywords found in the selected window.</p>}
+            </div>
+          </article>
+        </section>
+
+        <section className="panel">
+          <div className="panel-title-row">
+            <h2>Most Engaged Tweets</h2>
+            <span>engagement-ranked</span>
+          </div>
+          <div className="research-tweet-list">
+            {engagedTweets.slice(0, 8).map((tweet) => (
+              <article key={tweet.id} className="research-tweet-card">
+                <div className="compact-post-meta">
+                  <span>{tweet.author ? `@${tweet.author}` : 'Unknown author'}</span>
+                  <span>{formatDate(tweet.publishedAt)}</span>
+                </div>
+                <p className="selected-content">{tweet.text}</p>
+                <div className="compact-post-stats">
+                  <span>{formatNumber(tweet.engagement.likes)} likes</span>
+                  <span>{formatNumber(tweet.engagement.retweets)} reposts</span>
+                  <span>{formatNumber(tweet.engagement.replies)} replies</span>
+                  <span>score {formatNumber(tweet.engagement.score)}</span>
+                </div>
+                <div className="research-topic-tags">
+                  {tweet.topics.slice(0, 4).map((topic) => (
+                    <span key={`${tweet.id}-${topic}`} className="research-chip">
+                      {topic}
+                    </span>
+                  ))}
+                </div>
+              </article>
+            ))}
+            {engagedTweets.length === 0 && <p className="selected-content">No tweets qualified for engagement ranking in the selected window.</p>}
+          </div>
+        </section>
+
+        {(researchLoading || researchError) && (
+          <section className="panel">
+            {researchLoading && <p className="selected-content">Loading Ethereum trend analysis...</p>}
+            {researchError && <p className="error-text">{researchError}</p>}
+          </section>
+        )}
+      </>
+    )
+  }
+
   const renderPlatformPage = () => (
     <>
       <header className="hero-panel">
@@ -973,10 +1244,11 @@ function App() {
       <nav className="top-nav" aria-label="Main pages">
         {tabButton('LinkedIn', 'linkedin')}
         {tabButton('X', 'x')}
+        {tabButton('Research', 'research')}
         {tabButton('Insights', 'insights')}
       </nav>
 
-      {activePage === 'insights' ? renderInsights() : renderPlatformPage()}
+      {activePage === 'insights' ? renderInsights() : activePage === 'research' ? renderResearch() : renderPlatformPage()}
     </main>
   )
 }
