@@ -147,7 +147,7 @@ function normalizeResearchData(payload: Partial<ResearchTrendsResponse> | null):
 }
 
 function App() {
-  const [activePage, setActivePage] = useState<Page>('research')
+  const [activePage, setActivePage] = useState<Page>('x')
   const [posts, setPosts] = useState<Post[]>([])
   const [allSeriesByPost, setAllSeriesByPost] = useState<Record<string, TimeseriesPoint[]>>({})
   const [selectedPostByPlatform, setSelectedPostByPlatform] = useState<Record<'linkedin' | 'x', string>>({
@@ -164,7 +164,6 @@ function App() {
   const [researchLoading, setResearchLoading] = useState(false)
   const [researchError, setResearchError] = useState('')
   const analyticsPanelRef = useRef<HTMLDivElement | null>(null)
-  const researchRetryTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     async function loadDashboard() {
@@ -232,12 +231,31 @@ function App() {
   useEffect(() => {
     let isActive = true
 
-    async function loadResearchTrends() {
-      setResearchLoading(true)
+    async function loadResearchTrends(showLoading = false) {
+      if (showLoading) {
+        setResearchLoading(true)
+      }
       setResearchError('')
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/twitter/research/trends`)
+        const latestResponse = await fetch(
+          `${API_BASE_URL}/api/twitter/research/latest?ts=${Date.now()}`,
+          {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          }
+        )
+
+        const response = latestResponse.ok
+          ? latestResponse
+          : await fetch(`${API_BASE_URL}/api/twitter/research/trends?ts=${Date.now()}`, {
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache',
+              },
+            })
 
         if (!response.ok) {
           throw new Error('Unable to load research trend analysis.')
@@ -252,20 +270,20 @@ function App() {
           setResearchError(loadError instanceof Error ? loadError.message : 'Unknown error')
         }
       } finally {
-        if (isActive) {
+        if (isActive && showLoading) {
           setResearchLoading(false)
         }
       }
     }
 
-    loadResearchTrends()
+    loadResearchTrends(true)
+    const intervalId = window.setInterval(() => {
+      loadResearchTrends(false)
+    }, 60000)
 
     return () => {
       isActive = false
-      if (researchRetryTimerRef.current !== null) {
-        window.clearTimeout(researchRetryTimerRef.current)
-        researchRetryTimerRef.current = null
-      }
+      window.clearInterval(intervalId)
     }
   }, [])
 
@@ -1248,8 +1266,8 @@ function App() {
       <nav className="top-nav" aria-label="Main pages">
         {tabButton('LinkedIn', 'linkedin')}
         {tabButton('X', 'x')}
-        {tabButton('Research', 'research')}
         {tabButton('Insights', 'insights')}
+        {tabButton('Trends', 'research')}
       </nav>
 
       {activePage === 'insights' ? renderInsights() : activePage === 'research' ? renderResearch() : renderPlatformPage()}
