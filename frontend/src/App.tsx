@@ -147,7 +147,7 @@ function normalizeResearchData(payload: Partial<ResearchTrendsResponse> | null):
 }
 
 function App() {
-  const [activePage, setActivePage] = useState<Page>('x')
+  const [activePage, setActivePage] = useState<Page>('insights')
   const [posts, setPosts] = useState<Post[]>([])
   const [allSeriesByPost, setAllSeriesByPost] = useState<Record<string, TimeseriesPoint[]>>({})
   const [selectedPostByPlatform, setSelectedPostByPlatform] = useState<Record<'linkedin' | 'x', string>>({
@@ -550,6 +550,142 @@ function App() {
     }
   }, [overviewForPage])
 
+  const latestAcrossPosts = useMemo(() => {
+    return posts
+      .map((post) => {
+        const postSeries = allSeriesByPost[post._id] ?? []
+        const latest = postSeries[postSeries.length - 1]
+        if (!latest) {
+          return null
+        }
+
+        return {
+          ...post,
+          ...enrichSeries([latest])[0],
+          createdAt: post.publishedAt,
+        }
+      })
+      .filter((post): post is NonNullable<typeof post> => post !== null)
+  }, [posts, allSeriesByPost])
+
+  const insightsPlatformBreakdown = useMemo(() => {
+    const seed = {
+      linkedin: {
+        platform: 'linkedin' as const,
+        label: 'LinkedIn',
+        posts: 0,
+        impressions: 0,
+        engagement: 0,
+        engagementRate: 0,
+      },
+      x: {
+        platform: 'x' as const,
+        label: 'X',
+        posts: 0,
+        impressions: 0,
+        engagement: 0,
+        engagementRate: 0,
+      },
+    }
+
+    latestAcrossPosts.forEach((post) => {
+      const row = seed[post.platform]
+      const engagement = post.likeCount + post.replyCount + post.retweetCount + post.bookmarkCount
+      row.posts += 1
+      row.impressions += post.viewCount
+      row.engagement += engagement
+    })
+
+    return (Object.values(seed) as Array<(typeof seed)[keyof typeof seed]>).map((row) => ({
+      ...row,
+      engagementRate: row.impressions > 0 ? (row.engagement / row.impressions) * 100 : 0,
+    }))
+  }, [latestAcrossPosts])
+
+  const insightsDailyTotals = useMemo(() => {
+    const dateMap = new Map<string, { date: string; impressions: number; engagement: number }>()
+
+    posts.forEach((post) => {
+      const postSeries = enrichSeries(allSeriesByPost[post._id] ?? [])
+      postSeries.forEach((point) => {
+        const day = point.createdAt.slice(0, 10)
+        const existing = dateMap.get(day) ?? { date: day, impressions: 0, engagement: 0 }
+        existing.impressions += point.viewCount
+        existing.engagement += point.likeCount + point.replyCount + point.retweetCount + point.bookmarkCount
+        dateMap.set(day, existing)
+      })
+    })
+
+    return Array.from(dateMap.values())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((row) => ({
+        ...row,
+        engagementRate: row.impressions > 0 ? Number(((row.engagement / row.impressions) * 100).toFixed(2)) : 0,
+      }))
+  }, [posts, allSeriesByPost])
+
+  const insightsTopPerformers = useMemo(() => {
+    return [...latestAcrossPosts]
+      .sort((a, b) => {
+        const aScore = a.likeCount + a.replyCount + a.retweetCount * 1.15 + a.bookmarkCount * 1.2
+        const bScore = b.likeCount + b.replyCount + b.retweetCount * 1.15 + b.bookmarkCount * 1.2
+        return bScore - aScore
+      })
+      .slice(0, 4)
+  }, [latestAcrossPosts])
+
+  const insightsWatchlist = useMemo(() => {
+    return [...latestAcrossPosts]
+      .sort((a, b) => a.engagementRate - b.engagementRate)
+      .slice(0, 4)
+  }, [latestAcrossPosts])
+
+  const insightsExecutiveMetrics = useMemo(() => {
+    const totalImpressions = insightsPlatformBreakdown.reduce((sum, row) => sum + row.impressions, 0)
+    const totalEngagement = insightsPlatformBreakdown.reduce((sum, row) => sum + row.engagement, 0)
+    const totalPosts = insightsPlatformBreakdown.reduce((sum, row) => sum + row.posts, 0)
+    const engagementRate = totalImpressions > 0 ? (totalEngagement / totalImpressions) * 100 : 0
+
+    const latestWindow = insightsDailyTotals.slice(-7)
+    const previousWindow = insightsDailyTotals.slice(-14, -7)
+
+    const average = (arr: number[]) => {
+      if (arr.length === 0) {
+        return 0
+      }
+      return arr.reduce((sum, value) => sum + value, 0) / arr.length
+    }
+
+    const avgLatestImpressions = average(latestWindow.map((item) => item.impressions))
+    const avgPreviousImpressions = average(previousWindow.map((item) => item.impressions))
+    const avgLatestEngagementRate = average(latestWindow.map((item) => item.engagementRate))
+    const avgPreviousEngagementRate = average(previousWindow.map((item) => item.engagementRate))
+
+    const calcDelta = (current: number, previous: number) => {
+      if (previous === 0) {
+        return current > 0 ? 100 : 0
+      }
+      return ((current - previous) / previous) * 100
+    }
+
+    const impressionDelta = calcDelta(avgLatestImpressions, avgPreviousImpressions)
+    const engagementDelta = calcDelta(avgLatestEngagementRate, avgPreviousEngagementRate)
+
+    const strongestPlatform = [...insightsPlatformBreakdown].sort(
+      (a, b) => b.engagementRate - a.engagementRate
+    )[0]
+
+    return {
+      totalImpressions,
+      totalEngagement,
+      totalPosts,
+      engagementRate,
+      impressionDelta,
+      engagementDelta,
+      strongestPlatform,
+    }
+  }, [insightsPlatformBreakdown, insightsDailyTotals])
+
   const insightsSummary = useMemo(() => {
     const analyzed = posts
       .map((post) => {
@@ -652,60 +788,245 @@ function App() {
 
   const renderInsights = () => (
     <>
-      <header className="hero-panel">
-        <p className="eyebrow">MigaLabs Social Media</p>
-        <h1>Insights</h1>
-        <p className="hero-copy">Cross-platform summary with key performance indicators and post-level signal quality.</p>
+      <header className="hero-panel insights-hero">
+        <div>
+          <p className="eyebrow">MigaLabs Executive View</p>
+          <h1>Insights</h1>
+          <p className="hero-copy">
+            A broad performance read across LinkedIn and X with momentum tracking, channel efficiency, and narrative pressure.
+          </p>
+        </div>
+        <div className="insights-hero-badge-grid" aria-label="Executive pulse">
+          <article className="insights-hero-badge">
+            <h2>Posts Tracked</h2>
+            <p>{formatNumber(insightsExecutiveMetrics.totalPosts)}</p>
+          </article>
+          <article className="insights-hero-badge">
+            <h2>Net Reach</h2>
+            <p>{formatNumber(insightsExecutiveMetrics.totalImpressions)}</p>
+          </article>
+          <article className="insights-hero-badge">
+            <h2>Net Engagement</h2>
+            <p>{formatNumber(insightsExecutiveMetrics.totalEngagement)}</p>
+          </article>
+          <article className="insights-hero-badge">
+            <h2>Best Channel</h2>
+            <p>{insightsExecutiveMetrics.strongestPlatform?.label ?? '--'}</p>
+          </article>
+        </div>
       </header>
 
-      <section className="overview-grid" aria-label="Insights summary cards">
-        <article className="metric-card">
-          <h2>KPI</h2>
-          <p>{insightsSummary.kpiEngagementRate.toFixed(2)}%</p>
-          <small className="metric-subtext">Overall engagement rate</small>
+      <section className="overview-grid insights-impact-grid" aria-label="Insights summary cards">
+        <article className="metric-card insights-impact-card">
+          <h2>Overall Engagement Rate</h2>
+          <p>{insightsExecutiveMetrics.engagementRate.toFixed(2)}%</p>
+          <small className="metric-subtext">Across LinkedIn + X</small>
+        </article>
+        <article className="metric-card insights-impact-card">
+          <h2>7-Day Reach Momentum</h2>
+          <p>{insightsExecutiveMetrics.impressionDelta >= 0 ? '+' : ''}{insightsExecutiveMetrics.impressionDelta.toFixed(1)}%</p>
+          <small className="metric-subtext">Vs previous 7-day period</small>
+        </article>
+        <article className="metric-card insights-impact-card">
+          <h2>7-Day Engagement Momentum</h2>
+          <p>{insightsExecutiveMetrics.engagementDelta >= 0 ? '+' : ''}{insightsExecutiveMetrics.engagementDelta.toFixed(1)}%</p>
+          <small className="metric-subtext">ER trend acceleration</small>
+        </article>
+        <article className="metric-card insights-impact-card">
+          <h2>Top Performing Post</h2>
+          <p className="metric-post-title">{insightsSummary.topPost.content}</p>
+          <small className="metric-subtext">{insightsSummary.topPost.platform.toUpperCase()}</small>
         </article>
       </section>
 
       <section className="content-grid insights-grid">
         <article className="panel">
           <div className="panel-title-row">
-            <h2>Top Post</h2>
-            <span>{insightsSummary.topPost.platform.toUpperCase()}</span>
+            <h2>Channel Efficiency</h2>
+            <span>engagement rate by platform</span>
           </div>
-          <p className="selected-content">{insightsSummary.topPost.content}</p>
+          <div className="chart-wrap compact">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={insightsPlatformBreakdown}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
+                <XAxis dataKey="label" />
+                <YAxis yAxisId="left" />
+                <YAxis yAxisId="right" orientation="right" unit="%" domain={[0, 'auto']} />
+                <Tooltip
+                  formatter={(value, name) => {
+                    if (name === 'engagementRate') {
+                      return `${Number(value ?? 0).toFixed(2)}%`
+                    }
+                    return formatNumber(Number(value ?? 0))
+                  }}
+                />
+                <Legend />
+                <Bar yAxisId="left" dataKey="impressions" name="Impressions" fill="#5f96f3" radius={[6, 6, 0, 0]} />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="engagementRate"
+                  name="Engagement Rate"
+                  stroke="#ffb088"
+                  strokeWidth={2.4}
+                  dot={{ r: 4 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
         </article>
 
         <article className="panel">
           <div className="panel-title-row">
-            <h2>Worst Post</h2>
-            <span>{insightsSummary.worstPost.platform.toUpperCase()}</span>
+            <h2>Audience Momentum</h2>
+            <span>daily reach + ER</span>
           </div>
-          <p className="selected-content">{insightsSummary.worstPost.content}</p>
+          <div className="chart-wrap compact">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={insightsDailyTotals}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
+                <XAxis dataKey="date" tickFormatter={formatDate} />
+                <YAxis yAxisId="left" />
+                <YAxis yAxisId="right" orientation="right" unit="%" domain={[0, 'auto']} />
+                <Tooltip
+                  labelFormatter={(value) => formatDate(String(value))}
+                  formatter={(value, name) => {
+                    if (name === 'engagementRate') {
+                      return `${Number(value ?? 0).toFixed(2)}%`
+                    }
+                    return formatNumber(Number(value ?? 0))
+                  }}
+                />
+                <Legend />
+                <Area
+                  type="monotone"
+                  dataKey="impressions"
+                  name="Impressions"
+                  yAxisId="left"
+                  stroke="#5f96f3"
+                  fill="#11304d"
+                  fillOpacity={0.55}
+                  strokeWidth={2.2}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="engagementRate"
+                  name="Engagement Rate"
+                  yAxisId="right"
+                  stroke="#ff8f62"
+                  strokeWidth={2.25}
+                  dot={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="panel-title-row">
+            <h2>Winning Posts</h2>
+            <span>strongest engagement signals</span>
+          </div>
+          <div className="insights-post-list" role="list" aria-label="Top cross-platform posts">
+            {insightsTopPerformers.map((post) => (
+              <article key={post._id} className="insights-post-item" role="listitem">
+                <div className="compact-post-meta">
+                  <span>{post.platform.toUpperCase()}</span>
+                  <span>{formatDate(post.publishedAt)}</span>
+                </div>
+                <p className="selected-content">{post.content}</p>
+                <div className="compact-post-stats">
+                  <span>{formatNumber(post.viewCount)} views</span>
+                  <span>{formatNumber(post.likeCount)} likes</span>
+                  <span>{post.engagementRate.toFixed(2)}% ER</span>
+                </div>
+              </article>
+            ))}
+            {insightsTopPerformers.length === 0 && (
+              <p className="selected-content">No posts available to rank yet.</p>
+            )}
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="panel-title-row">
+            <h2>Risk Watchlist</h2>
+            <span>low-performing posts</span>
+          </div>
+          <div className="insights-post-list" role="list" aria-label="Posts needing optimization">
+            {insightsWatchlist.map((post) => (
+              <article key={`${post._id}-risk`} className="insights-post-item" role="listitem">
+                <div className="compact-post-meta">
+                  <span>{post.platform.toUpperCase()}</span>
+                  <span>{formatDate(post.publishedAt)}</span>
+                </div>
+                <p className="selected-content">{post.content}</p>
+                <div className="compact-post-stats">
+                  <span>{formatNumber(post.viewCount)} views</span>
+                  <span>{formatNumber(post.likeCount + post.replyCount + post.retweetCount)} interactions</span>
+                  <span>{post.engagementRate.toFixed(2)}% ER</span>
+                </div>
+              </article>
+            ))}
+            {insightsWatchlist.length === 0 && (
+              <p className="selected-content">No watchlist candidates available yet.</p>
+            )}
+          </div>
         </article>
 
         <article className="panel insights-trends-placeholder">
           <div className="panel-title-row">
-            <h2>Ethereum Trends</h2>
-            <span>{researchData ? 'latest research' : 'loading'}</span>
+            <h2>Market Narrative Pulse</h2>
+            <span>{researchData ? 'live trend context' : 'loading context'}</span>
           </div>
           {researchData ? (
             <div className="research-insights-summary">
               <p className="selected-content">
-                {researchData.analyzedTweets} tweets analyzed from list {researchData.listId}.
+                {researchData.analyzedTweets} tweets analyzed from list {researchData.listId}. Most active topic:{' '}
+                {researchData.topicBreakdown[0]?.topic ?? 'No topic found'}.
               </p>
               <p className="selected-content">
-                Top topic: {researchData.topicBreakdown[0]?.topic ?? 'No topic found'}
+                Daily volume peak: {Math.max(...researchData.dailyVolume.map((item) => item.tweetCount), 0)} tweets.
+                Leading keyword: {researchData.topKeywords[0]?.keyword ?? 'No keyword found'}.
               </p>
-              <p className="selected-content">
-                Daily volume peak: {Math.max(...researchData.dailyVolume.map((item) => item.tweetCount), 0)} tweets
-              </p>
-              <p className="selected-content">
-                Top keyword: {researchData.topKeywords[0]?.keyword ?? 'No keyword found'}
-              </p>
+              <div className="research-chip-list">
+                {researchData.topHashtags.slice(0, 8).map((tag) => (
+                  <span key={tag.hashtag} className="research-chip">
+                    #{tag.hashtag} ({formatNumber(tag.count)})
+                  </span>
+                ))}
+              </div>
             </div>
           ) : (
-            <p className="selected-content">Loading the latest Ethereum trend snapshot...</p>
+            <p className="selected-content">Loading market narrative intelligence...</p>
           )}
+        </article>
+
+        <article className="panel">
+          <div className="panel-title-row">
+            <h2>Reach Contribution</h2>
+            <span>impressions split</span>
+          </div>
+          <div className="chart-wrap compact pie">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={insightsPlatformBreakdown}
+                  dataKey="impressions"
+                  nameKey="label"
+                  innerRadius={52}
+                  outerRadius={88}
+                  paddingAngle={4}
+                >
+                  {insightsPlatformBreakdown.map((entry, index) => (
+                    <Cell key={entry.platform} fill={mixColors[index % mixColors.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => formatNumber(Number(value ?? 0))} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </article>
       </section>
     </>

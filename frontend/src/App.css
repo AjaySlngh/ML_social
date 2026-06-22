@@ -71,6 +71,75 @@
   grid-template-columns: 1fr 1fr;
 }
 
+.insights-hero {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 1rem;
+  align-items: end;
+}
+
+.insights-hero h1 {
+  background: linear-gradient(100deg, #ffffff 0%, #ffd8ca 45%, #ff8f62 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.insights-hero-badge-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.insights-hero-badge {
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 143, 98, 0.42);
+  background: linear-gradient(145deg, rgba(255, 143, 98, 0.16), rgba(28, 36, 51, 0.68));
+  padding: 0.72rem 0.78rem;
+}
+
+.insights-hero-badge h2 {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #ffd7cc;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.insights-hero-badge p {
+  margin-top: 0.28rem;
+  font-size: 1.25rem;
+  line-height: 1.1;
+  color: #fffaf8;
+  font-weight: 700;
+}
+
+.insights-impact-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.insights-impact-card {
+  background:
+    radial-gradient(circle at 18% 14%, rgba(255, 143, 98, 0.22), transparent 40%),
+    linear-gradient(150deg, rgba(28, 36, 51, 0.93), rgba(42, 48, 64, 0.93));
+}
+
+.insights-post-list {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.insights-post-item {
+  border: 1px solid #3d4354;
+  border-radius: 0.85rem;
+  background: linear-gradient(145deg, rgba(33, 43, 59, 0.95), rgba(24, 31, 45, 0.95));
+  padding: 0.72rem 0.78rem;
+}
+
+.insights-post-item .selected-content {
+  margin-top: 0.45rem;
+}
+
 .insights-trends-placeholder {
   grid-column: 1 / -1;
 }
@@ -454,6 +523,14 @@ tr.is-selected {
     grid-template-columns: 1fr;
   }
 
+  .insights-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .insights-impact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .chart-grid-secondary {
     grid-template-columns: 1fr;
   }
@@ -490,6 +567,14 @@ tr.is-selected {
 
   .metric-card p {
     font-size: 1.5rem;
+  }
+
+  .insights-hero-badge-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .insights-impact-grid {
+    grid-template-columns: 1fr;
   }
 
   th,
