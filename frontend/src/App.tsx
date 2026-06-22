@@ -8,14 +8,10 @@ import {
   ComposedChart,
   Legend,
   Line,
-  ReferenceLine,
   ResponsiveContainer,
-  Scatter,
-  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
-  ZAxis,
 } from 'recharts'
 import './App.css'
 
@@ -365,38 +361,6 @@ function App() {
       { likes: 0, comments: 0, impressions: 0, savesOrBookmarks: 0, shares: 0 }
     )
   }, [latestByPost])
-
-  const scatterLikes = useMemo(
-    () =>
-      latestByPost.map((post) => ({
-        engagementRate: Number(post.engagementRate.toFixed(2)),
-        likes: post.likeCount,
-        views: post.viewCount,
-        postId: post.externalPostId,
-        publishedAt: post.publishedAt,
-      })),
-    [latestByPost]
-  )
-
-  const scatterBenchmarks = useMemo(() => {
-    if (scatterLikes.length === 0) {
-      return { avgLikes: 0, avgEngagementRate: 0 }
-    }
-
-    const totals = scatterLikes.reduce(
-      (acc, point) => {
-        acc.likes += point.likes
-        acc.engagementRate += point.engagementRate
-        return acc
-      },
-      { likes: 0, engagementRate: 0 }
-    )
-
-    return {
-      avgLikes: totals.likes / scatterLikes.length,
-      avgEngagementRate: totals.engagementRate / scatterLikes.length,
-    }
-  }, [scatterLikes])
 
   const linkedinCardMetrics = useMemo(() => {
     const clicks = Math.max(0, Math.round(overviewForPage.impressions * 0.07))
@@ -1342,57 +1306,6 @@ function App() {
         </div>
       </section>
 
-      <section className="chart-grid-secondary">
-        <article className="panel">
-          <div className="panel-title-row">
-            <h2>Likes Efficiency Map</h2>
-            <span>likes vs engagement rate</span>
-          </div>
-          <div className="chart-wrap compact">
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
-                <XAxis
-                  type="number"
-                  dataKey="engagementRate"
-                  name="Engagement Rate"
-                  unit="%"
-                  domain={[0, 'auto']}
-                  tickFormatter={(value) => `${Number(value ?? 0).toFixed(1)}%`}
-                />
-                <YAxis type="number" dataKey="likes" name="Likes" />
-                <ZAxis type="number" dataKey="views" range={[80, 420]} name="Views" />
-                <ReferenceLine
-                  x={scatterBenchmarks.avgEngagementRate}
-                  stroke="#ff8f62"
-                  strokeDasharray="4 4"
-                  label={{ value: 'Avg ER', fill: '#ff8f62', position: 'insideTopRight' }}
-                />
-                <ReferenceLine
-                  y={scatterBenchmarks.avgLikes}
-                  stroke="#73c476"
-                  strokeDasharray="4 4"
-                  label={{ value: 'Avg Likes', fill: '#73c476', position: 'insideTopLeft' }}
-                />
-                <Tooltip
-                  labelFormatter={(_, payload) => {
-                    const point = payload?.[0]?.payload
-                    return point ? `${point.postId} • ${formatDate(point.publishedAt)}` : ''
-                  }}
-                  formatter={(value, name) => {
-                    if (name === 'Engagement Rate') {
-                      return `${Number(value ?? 0).toFixed(2)}%`
-                    }
-                    return formatNumber(Number(value ?? 0))
-                  }}
-                />
-                <Scatter name="Posts" data={scatterLikes} fill="#5590f3" />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
-        </article>
-
-      </section>
     </>
   )
 

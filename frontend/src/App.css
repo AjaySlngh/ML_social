@@ -13,7 +13,7 @@
   width: fit-content;
   margin: 0.4rem auto 0.15rem;
   padding: 0.45rem;
-  background: linear-gradient(145deg, rgba(28, 36, 51, 0.92), rgba(42, 48, 64, 0.9));
+  background: #1c2433;
   border: 1px solid #3d4354;
   border-radius: 999px;
   box-shadow: 0 10px 24px rgba(2, 6, 23, 0.32);
@@ -44,7 +44,7 @@
 }
 
 .nav-link.is-active {
-  background: linear-gradient(120deg, #e05d38, #f69f72);
+  background: #e05d38;
   color: #fff;
   border-color: rgba(255, 255, 255, 0.16);
   box-shadow: 0 6px 14px rgba(255, 87, 41, 0.3);
