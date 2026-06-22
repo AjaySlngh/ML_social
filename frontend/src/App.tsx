@@ -427,7 +427,7 @@ function App() {
       engagementRate,
       reposts: overviewForPage.shares,
       likes: overviewForPage.likes,
-      profileVisits: null as number | null,
+      replies: overviewForPage.comments,
     }
   }, [overviewForPage])
 
@@ -1130,7 +1130,7 @@ function App() {
               <p>{xCardMetrics.engagementRate.toFixed(2)}%</p>
             </article>
             <article className="metric-card">
-              <h2>Repost</h2>
+              <h2>Reposts</h2>
               <p>{formatNumber(xCardMetrics.reposts)}</p>
             </article>
             <article className="metric-card">
@@ -1138,9 +1138,8 @@ function App() {
               <p>{formatNumber(xCardMetrics.likes)}</p>
             </article>
             <article className="metric-card">
-              <h2>Profile Visits</h2>
-              <p>{xCardMetrics.profileVisits === null ? '--' : formatNumber(xCardMetrics.profileVisits)}</p>
-              <small className="metric-subtext">Unavailable until API integration</small>
+              <h2>Replies</h2>
+              <p>{formatNumber(xCardMetrics.replies)}</p>
             </article>
           </>
         )}
@@ -1246,7 +1245,7 @@ function App() {
                     formatter={(value) => formatNumber(Number(value ?? 0))}
                   />
                   <Legend />
-                  <Bar dataKey="retweetCount" name="Retweets" fill="#5590f3" barSize={14} />
+                  <Bar dataKey="retweetCount" name="Reposts" fill="#5590f3" barSize={14} />
                   <Line type="monotone" dataKey="likeCount" name="Likes" stroke="#fd8b5d" strokeWidth={2.5} dot={false} />
                   <Line type="monotone" dataKey="replyCount" name="Replies" stroke="#73c476" strokeWidth={2.5} dot={false} />
                 </ComposedChart>
