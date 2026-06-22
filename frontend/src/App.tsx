@@ -5,23 +5,17 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   ComposedChart,
   Legend,
   Line,
-  Pie,
-  PieChart,
-  PolarAngleAxis,
-  PolarGrid,
-  PolarRadiusAxis,
-  Radar,
-  RadarChart,
+  ReferenceLine,
   ResponsiveContainer,
   Scatter,
   ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
+  ZAxis,
 } from 'recharts'
 import './App.css'
 
@@ -116,7 +110,6 @@ type ResearchTrendsResponse = {
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000'
-const WEEKDAY_ORDER = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const POSTS_PER_PAGE = 6
 type Page = 'insights' | 'linkedin' | 'x' | 'research'
 
@@ -315,8 +308,6 @@ function App() {
     })
   }
 
-  const mixColors = ['#da6b61', '#73c476', '#ff5729', '#ff5729']
-
   const activePlatform = activePage === 'linkedin' || activePage === 'x' ? activePage : null
 
   const platformPosts = useMemo(
@@ -343,8 +334,6 @@ function App() {
     () => (selectedPostId ? enrichSeries(allSeriesByPost[selectedPostId] ?? []) : []),
     [selectedPostId, allSeriesByPost]
   )
-  const latestPoint = selectedSeries[selectedSeries.length - 1]
-
   const latestByPost = useMemo(() => {
     return platformPosts
       .map((post) => {
@@ -377,110 +366,37 @@ function App() {
     )
   }, [latestByPost])
 
-  const overviewMix = useMemo(
-    () => [
-      { name: 'Likes', value: overviewForPage.likes },
-      { name: 'Comments', value: overviewForPage.comments },
-      { name: 'Saves', value: overviewForPage.savesOrBookmarks },
-      { name: 'Shares', value: overviewForPage.shares },
-    ],
-    [overviewForPage]
-  )
-
-  const postsByWeekday = useMemo(() => {
-    const buckets = new Map<string, { sum: number; count: number }>()
-    WEEKDAY_ORDER.forEach((day) => buckets.set(day, { sum: 0, count: 0 }))
-
-    latestByPost.forEach((post) => {
-      const day = WEEKDAY_ORDER[new Date(post.createdAt).getDay()]
-      const bucket = buckets.get(day)
-      if (!bucket) {
-        return
-      }
-      bucket.sum += post.likeCount
-      bucket.count += 1
-    })
-
-    return WEEKDAY_ORDER.map((day) => {
-      const bucket = buckets.get(day)
-      const avgLikeCount = bucket && bucket.count > 0 ? Number((bucket.sum / bucket.count).toFixed(1)) : 0
-      return { day, avgLikeCount }
-    })
-  }, [latestByPost])
-
-  const radarMix = useMemo(() => {
-    if (!latestPoint) {
-      return []
-    }
-
-    const metrics = [
-      { metric: 'Likes', value: latestPoint.likeCount },
-      { metric: 'Retweets', value: latestPoint.retweetCount },
-      { metric: 'Replies', value: latestPoint.replyCount },
-      { metric: 'Quotes', value: latestPoint.quoteCount },
-      { metric: 'Bookmarks', value: latestPoint.bookmarkCount },
-    ]
-    const maxValue = Math.max(...metrics.map((item) => item.value), 1)
-
-    return metrics.map((item) => ({
-      ...item,
-      normalized: Number(((item.value / maxValue) * 100).toFixed(1)),
-    }))
-  }, [latestPoint])
-
-  const scatterViewsLikes = useMemo(
+  const scatterLikes = useMemo(
     () =>
       latestByPost.map((post) => ({
-        x: post.viewCount,
-        y: post.likeCount,
-        label: post.externalPostId,
+        engagementRate: Number(post.engagementRate.toFixed(2)),
+        likes: post.likeCount,
+        views: post.viewCount,
+        postId: post.externalPostId,
+        publishedAt: post.publishedAt,
       })),
     [latestByPost]
   )
 
-  const stackedByWeek = useMemo(() => {
-    const weekMap = new Map<
-      string,
-      {
-        week: string
-        likeCount: number
-        retweetCount: number
-        replyCount: number
-        quoteCount: number
-        bookmarkCount: number
-      }
-    >()
+  const scatterBenchmarks = useMemo(() => {
+    if (scatterLikes.length === 0) {
+      return { avgLikes: 0, avgEngagementRate: 0 }
+    }
 
-    platformPosts.forEach((post) => {
-      const postSeries = allSeriesByPost[post._id] ?? []
-      postSeries.forEach((point) => {
-        const date = new Date(point.date)
-        const startOfYear = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
-        const dayOffset = Math.floor((date.getTime() - startOfYear.getTime()) / 86400000)
-        const weekNumber = Math.ceil((dayOffset + startOfYear.getUTCDay() + 1) / 7)
-        const week = `${date.getUTCFullYear()}-W${String(weekNumber).padStart(2, '0')}`
+    const totals = scatterLikes.reduce(
+      (acc, point) => {
+        acc.likes += point.likes
+        acc.engagementRate += point.engagementRate
+        return acc
+      },
+      { likes: 0, engagementRate: 0 }
+    )
 
-        const existing = weekMap.get(week) ?? {
-          week,
-          likeCount: 0,
-          retweetCount: 0,
-          replyCount: 0,
-          quoteCount: 0,
-          bookmarkCount: 0,
-        }
-
-        const enriched = enrichSeries([point])[0]
-        existing.likeCount += enriched.likeCount
-        existing.retweetCount += enriched.retweetCount
-        existing.replyCount += enriched.replyCount
-        existing.quoteCount += enriched.quoteCount
-        existing.bookmarkCount += enriched.bookmarkCount
-        weekMap.set(week, existing)
-      })
-    })
-
-    return Array.from(weekMap.values()).sort((a, b) => a.week.localeCompare(b.week))
-  }, [platformPosts, allSeriesByPost])
+    return {
+      avgLikes: totals.likes / scatterLikes.length,
+      avgEngagementRate: totals.engagementRate / scatterLikes.length,
+    }
+  }, [scatterLikes])
 
   const linkedinCardMetrics = useMemo(() => {
     const clicks = Math.max(0, Math.round(overviewForPage.impressions * 0.07))
@@ -515,11 +431,11 @@ function App() {
       (best, post) => {
         const score = post.likeCount + post.replyCount + post.retweetCount * 1.2
         if (score > best.score) {
-          return { title: post.content, score }
+          return { title: post.content, score, postId: post._id }
         }
         return best
       },
-      { title: 'No post available', score: -1 }
+      { title: 'No post available', score: -1, postId: '' }
     )
 
     return {
@@ -529,6 +445,7 @@ function App() {
       followerGrowthDays,
       clicks,
       topPostTitle: topPost.title,
+      topPostId: topPost.postId,
     }
   }, [overviewForPage, platformPosts, allSeriesByPost, latestByPost])
 
@@ -549,6 +466,32 @@ function App() {
       profileVisits: null as number | null,
     }
   }, [overviewForPage])
+
+  const displayedPosts = useMemo(() => {
+    if (activePlatform !== 'linkedin' || !linkedinCardMetrics.topPostId) {
+      return paginatedPosts
+    }
+
+    const topPost = platformPosts.find((post) => post._id === linkedinCardMetrics.topPostId)
+    if (!topPost) {
+      return paginatedPosts
+    }
+
+    const remainingPosts = platformPosts.filter((post) => post._id !== linkedinCardMetrics.topPostId)
+
+    if (clampedPostPage === 1) {
+      return [topPost, ...remainingPosts.slice(0, POSTS_PER_PAGE - 1)]
+    }
+
+    const remainingStart = POSTS_PER_PAGE - 1 + (clampedPostPage - 2) * POSTS_PER_PAGE
+    return remainingPosts.slice(remainingStart, remainingStart + POSTS_PER_PAGE)
+  }, [
+    activePlatform,
+    clampedPostPage,
+    linkedinCardMetrics.topPostId,
+    paginatedPosts,
+    platformPosts,
+  ])
 
   const latestAcrossPosts = useMemo(() => {
     return posts
@@ -790,7 +733,6 @@ function App() {
     <>
       <header className="hero-panel insights-hero">
         <div>
-          <p className="eyebrow">MigaLabs Executive View</p>
           <h1>Insights</h1>
           <p className="hero-copy">
             A broad performance read across LinkedIn and X with momentum tracking, channel efficiency, and narrative pressure.
@@ -1002,32 +944,6 @@ function App() {
           )}
         </article>
 
-        <article className="panel">
-          <div className="panel-title-row">
-            <h2>Reach Contribution</h2>
-            <span>impressions split</span>
-          </div>
-          <div className="chart-wrap compact pie">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={insightsPlatformBreakdown}
-                  dataKey="impressions"
-                  nameKey="label"
-                  innerRadius={52}
-                  outerRadius={88}
-                  paddingAngle={4}
-                >
-                  {insightsPlatformBreakdown.map((entry, index) => (
-                    <Cell key={entry.platform} fill={mixColors[index % mixColors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatNumber(Number(value ?? 0))} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </article>
       </section>
     </>
   )
@@ -1042,7 +958,6 @@ function App() {
     return (
       <>
         <header className="hero-panel">
-          <p className="eyebrow">MigaLabs Social Research</p>
           <h1>Ethereum Trends</h1>
           <p className="hero-copy">
             Curated-list analysis for Ethereum conversations over the past week, including topic momentum, engagement,
@@ -1208,7 +1123,6 @@ function App() {
   const renderPlatformPage = () => (
     <>
       <header className="hero-panel">
-        <p className="eyebrow">MigaLabs Social Media</p>
         <h1>{activePlatform === 'linkedin' ? 'LinkedIn Analytics' : 'X Analytics'}</h1>
         <p className="hero-copy">Platform-specific mock analytics feed with charted trends and engagement composition.</p>
       </header>
@@ -1239,10 +1153,6 @@ function App() {
             <article className="metric-card">
               <h2>Clicks</h2>
               <p>{formatNumber(linkedinCardMetrics.clicks)}</p>
-            </article>
-            <article className="metric-card">
-              <h2>Top Post</h2>
-              <p className="metric-post-title">{linkedinCardMetrics.topPostTitle}</p>
             </article>
           </>
         ) : (
@@ -1280,81 +1190,45 @@ function App() {
               {platformPosts.length} records | Page {clampedPostPage} of {totalPostPages}
             </span>
           </div>
-          {activePlatform === 'x' ? (
-            <div className="compact-post-list" role="list" aria-label="X posts">
-              {paginatedPosts.map((post) => {
-                const postSeries = allSeriesByPost[post._id] ?? []
-                const latest = postSeries.length > 0 ? enrichSeries([postSeries[postSeries.length - 1]])[0] : null
+          <div className="compact-post-list" role="list" aria-label={`${activePlatform === 'linkedin' ? 'LinkedIn' : 'X'} posts`}>
+            {displayedPosts.map((post) => {
+              const postSeries = allSeriesByPost[post._id] ?? []
+              const latest = postSeries.length > 0 ? enrichSeries([postSeries[postSeries.length - 1]])[0] : null
+              const isTopLinkedinPost =
+                activePlatform === 'linkedin' && post._id === linkedinCardMetrics.topPostId
 
-                return (
-                  <button
-                    key={post._id}
-                    type="button"
-                    className={`compact-post-card ${selectedPostId === post._id ? 'is-selected' : ''}`}
-                    onClick={() => {
-                      if (!activePlatform) {
-                        return
-                      }
-                      setSelectedPostByPlatform((prev) => ({ ...prev, [activePlatform]: post._id }))
-                      if (window.matchMedia('(max-width: 1024px)').matches) {
-                        requestAnimationFrame(() => {
-                          analyticsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                        })
-                      }
-                    }}
-                  >
-                    <div className="compact-post-meta">
-                      <span>{formatDate(post.publishedAt)}</span>
-                      <span>{latest ? `${formatNumber(latest.viewCount)} views` : 'No metrics yet'}</span>
-                    </div>
-                    <p className="compact-post-preview">{post.content}</p>
-                    <div className="compact-post-stats" aria-hidden="true">
-                      <span>{latest ? `${formatNumber(latest.likeCount)} likes` : '-- likes'}</span>
-                      <span>{latest ? `${formatNumber(latest.retweetCount)} reposts` : '-- reposts'}</span>
-                      <span>{latest ? `${latest.engagementRate.toFixed(2)}% ER` : '-- ER'}</span>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Platform</th>
-                    <th>Account</th>
-                    <th>Content</th>
-                    <th>Published</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedPosts.map((post) => (
-                    <tr
-                      key={post._id}
-                      className={selectedPostId === post._id ? 'is-selected' : ''}
-                      onClick={() => {
-                        if (!activePlatform) {
-                          return
-                        }
-                        setSelectedPostByPlatform((prev) => ({ ...prev, [activePlatform]: post._id }))
-                        if (window.matchMedia('(max-width: 1024px)').matches) {
-                          requestAnimationFrame(() => {
-                            analyticsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                          })
-                        }
-                      }}
-                    >
-                      <td>{post.platform.toUpperCase()}</td>
-                      <td>{post.accountName}</td>
-                      <td>{post.content}</td>
-                      <td>{formatDate(post.publishedAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+              return (
+                <button
+                  key={post._id}
+                  type="button"
+                  className={`compact-post-card ${selectedPostId === post._id ? 'is-selected' : ''}`}
+                  onClick={() => {
+                    if (!activePlatform) {
+                      return
+                    }
+                    setSelectedPostByPlatform((prev) => ({ ...prev, [activePlatform]: post._id }))
+                    if (window.matchMedia('(max-width: 1024px)').matches) {
+                      requestAnimationFrame(() => {
+                        analyticsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      })
+                    }
+                  }}
+                >
+                  <div className="compact-post-meta">
+                    <span>{isTopLinkedinPost ? `📌 ${formatDate(post.publishedAt)}` : formatDate(post.publishedAt)}</span>
+                    <span>{latest ? `${formatNumber(latest.viewCount)} views` : 'No metrics yet'}</span>
+                  </div>
+                  <p className="compact-post-preview">{post.content}</p>
+                  <div className="compact-post-stats" aria-hidden="true">
+                    <span>{latest ? `${formatNumber(latest.likeCount)} likes` : '-- likes'}</span>
+                    <span>{latest ? `${formatNumber(latest.retweetCount)} reposts` : '-- reposts'}</span>
+                    <span>{latest ? `${latest.engagementRate.toFixed(2)}% ER` : '-- ER'}</span>
+                  </div>
+                  {isTopLinkedinPost && <span className="table-pill compact-post-pill">Top Post</span>}
+                </button>
+              )
+            })}
+          </div>
           <div className="posts-pagination" aria-label="Posts pagination controls">
             <button
               type="button"
@@ -1395,7 +1269,7 @@ function App() {
               <span>{selectedPost?.externalPostId ?? 'No post selected'}</span>
             </div>
 
-            <p className="selected-content">{selectedPost?.content ?? 'Select a post from the table.'}</p>
+            <p className="selected-content">{selectedPost?.content ?? 'Select a post from the list.'}</p>
 
             <div className="chart-wrap">
               <ResponsiveContainer width="100%" height="100%">
@@ -1465,119 +1339,59 @@ function App() {
             </div>
           </article>
 
-          <article className="panel">
-            <div className="panel-title-row">
-              <h2>Posts by Day of Week</h2>
-              <span>avg likes</span>
-            </div>
-            <div className="chart-wrap compact">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={postsByWeekday}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => formatNumber(Number(value ?? 0))} />
-                  <Bar dataKey="avgLikeCount" name="Avg Likes" fill="#00aad0" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </article>
         </div>
       </section>
 
       <section className="chart-grid-secondary">
         <article className="panel">
           <div className="panel-title-row">
-            <h2>Engagement Mix Radar</h2>
-            <span>0-100 normalized</span>
-          </div>
-          <div className="chart-wrap compact">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart outerRadius={88} data={radarMix}>
-                <PolarGrid stroke="#3d4354" />
-                <PolarAngleAxis dataKey="metric" stroke="#d1d5dc" />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                <Radar
-                  name="Normalized"
-                  dataKey="normalized"
-                  stroke="#f69f72"
-                  fill="#e05d38"
-                  fillOpacity={0.35}
-                />
-                <Tooltip formatter={(value) => `${Number(value ?? 0).toFixed(1)}%`} />
-                <Legend />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        </article>
-
-        <article className="panel">
-          <div className="panel-title-row">
-            <h2>Views vs Likes Scatter</h2>
-            <span>one dot per post</span>
+            <h2>Likes Efficiency Map</h2>
+            <span>likes vs engagement rate</span>
           </div>
           <div className="chart-wrap compact">
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart>
                 <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
-                <XAxis dataKey="x" name="Views" />
-                <YAxis dataKey="y" name="Likes" />
-                <Tooltip formatter={(value) => formatNumber(Number(value ?? 0))} />
-                <Scatter name="Posts" data={scatterViewsLikes} fill="#5590f3" />
+                <XAxis
+                  type="number"
+                  dataKey="engagementRate"
+                  name="Engagement Rate"
+                  unit="%"
+                  domain={[0, 'auto']}
+                  tickFormatter={(value) => `${Number(value ?? 0).toFixed(1)}%`}
+                />
+                <YAxis type="number" dataKey="likes" name="Likes" />
+                <ZAxis type="number" dataKey="views" range={[80, 420]} name="Views" />
+                <ReferenceLine
+                  x={scatterBenchmarks.avgEngagementRate}
+                  stroke="#ff8f62"
+                  strokeDasharray="4 4"
+                  label={{ value: 'Avg ER', fill: '#ff8f62', position: 'insideTopRight' }}
+                />
+                <ReferenceLine
+                  y={scatterBenchmarks.avgLikes}
+                  stroke="#73c476"
+                  strokeDasharray="4 4"
+                  label={{ value: 'Avg Likes', fill: '#73c476', position: 'insideTopLeft' }}
+                />
+                <Tooltip
+                  labelFormatter={(_, payload) => {
+                    const point = payload?.[0]?.payload
+                    return point ? `${point.postId} • ${formatDate(point.publishedAt)}` : ''
+                  }}
+                  formatter={(value, name) => {
+                    if (name === 'Engagement Rate') {
+                      return `${Number(value ?? 0).toFixed(2)}%`
+                    }
+                    return formatNumber(Number(value ?? 0))
+                  }}
+                />
+                <Scatter name="Posts" data={scatterLikes} fill="#5590f3" />
               </ScatterChart>
             </ResponsiveContainer>
           </div>
         </article>
 
-        <article className="panel">
-          <div className="panel-title-row">
-            <h2>Stacked Engagement by Week</h2>
-            <span>trend composition</span>
-          </div>
-          <div className="chart-wrap compact">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stackedByWeek}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3d4354" />
-                <XAxis dataKey="week" />
-                <YAxis />
-                <Tooltip formatter={(value) => formatNumber(Number(value ?? 0))} />
-                <Legend />
-                <Bar dataKey="likeCount" name="Likes" stackId="eng" fill="#fd8b5d" />
-                <Bar dataKey="retweetCount" name="Retweets" stackId="eng" fill="#5590f3" />
-                <Bar dataKey="replyCount" name="Replies" stackId="eng" fill="#73c476" />
-                <Bar dataKey="quoteCount" name="Quotes" stackId="eng" fill="#8c79e0" />
-                <Bar dataKey="bookmarkCount" name="Bookmarks" stackId="eng" fill="#e1b75c" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </article>
-
-        <article className="panel">
-          <div className="panel-title-row">
-            <h2>Portfolio Mix</h2>
-            <span>all posts</span>
-          </div>
-          <div className="chart-wrap compact pie">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={overviewMix}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={52}
-                  outerRadius={88}
-                  paddingAngle={4}
-                >
-                  {overviewMix.map((entry, index) => (
-                    <Cell key={entry.name} fill={mixColors[index % mixColors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => formatNumber(Number(value ?? 0))} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </article>
       </section>
     </>
   )
@@ -1587,8 +1401,8 @@ function App() {
       <nav className="top-nav" aria-label="Main pages">
         {tabButton('LinkedIn', 'linkedin')}
         {tabButton('X', 'x')}
-        {tabButton('Insights', 'insights')}
         {tabButton('Trends', 'research')}
+        {tabButton('Insights', 'insights')}
       </nav>
 
       {activePage === 'insights' ? renderInsights() : activePage === 'research' ? renderResearch() : renderPlatformPage()}
