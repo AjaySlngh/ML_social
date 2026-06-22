@@ -702,25 +702,26 @@ function App() {
             A broad performance read across LinkedIn and X with momentum tracking, channel efficiency, and narrative pressure.
           </p>
         </div>
-        <div className="insights-hero-badge-grid" aria-label="Executive pulse">
-          <article className="insights-hero-badge">
-            <h2>Posts Tracked</h2>
-            <p>{formatNumber(insightsExecutiveMetrics.totalPosts)}</p>
-          </article>
-          <article className="insights-hero-badge">
-            <h2>Net Reach</h2>
-            <p>{formatNumber(insightsExecutiveMetrics.totalImpressions)}</p>
-          </article>
-          <article className="insights-hero-badge">
-            <h2>Net Engagement</h2>
-            <p>{formatNumber(insightsExecutiveMetrics.totalEngagement)}</p>
-          </article>
-          <article className="insights-hero-badge">
-            <h2>Best Channel</h2>
-            <p>{insightsExecutiveMetrics.strongestPlatform?.label ?? '--'}</p>
-          </article>
-        </div>
       </header>
+
+      <div className="insights-hero-badge-grid" aria-label="Executive pulse">
+        <article className="insights-hero-badge">
+          <h2>Posts Tracked</h2>
+          <p>{formatNumber(insightsExecutiveMetrics.totalPosts)}</p>
+        </article>
+        <article className="insights-hero-badge">
+          <h2>Net Reach</h2>
+          <p>{formatNumber(insightsExecutiveMetrics.totalImpressions)}</p>
+        </article>
+        <article className="insights-hero-badge">
+          <h2>Net Engagement</h2>
+          <p>{formatNumber(insightsExecutiveMetrics.totalEngagement)}</p>
+        </article>
+        <article className="insights-hero-badge">
+          <h2>Best Channel</h2>
+          <p>{insightsExecutiveMetrics.strongestPlatform?.label ?? '--'}</p>
+        </article>
+      </div>
 
       <section className="overview-grid insights-impact-grid" aria-label="Insights summary cards">
         <article className="metric-card insights-impact-card">

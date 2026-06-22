@@ -87,21 +87,23 @@
 
 .insights-hero-badge-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.65rem;
+  width: 100%;
+  margin-bottom: 40px;
 }
 
 .insights-hero-badge {
   border-radius: 0.9rem;
-  border: 1px solid rgba(255, 143, 98, 0.42);
-  background: #2B2E3C;
+  border: 1px solid #FF5729;
+  background-color: rgba(255, 87, 41, 0.14);
   padding: 0.72rem 0.78rem;
 }
 
 .insights-hero-badge h2 {
   margin: 0;
   font-size: 0.78rem;
-  color: #ffd7cc;
+  color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -110,7 +112,7 @@
   margin-top: 0.28rem;
   font-size: 1.25rem;
   line-height: 1.1;
-  color: #fffaf8;
+  color: #ffffff;
   font-weight: 700;
 }
 
@@ -595,6 +597,7 @@ tr.is-top-post {
 
   .insights-hero-badge-grid {
     grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .insights-impact-grid {
