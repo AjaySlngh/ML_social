@@ -366,7 +366,7 @@ function App() {
     const clicks = Math.max(0, Math.round(overviewForPage.impressions * 0.07))
     const engagementRate =
       overviewForPage.impressions > 0
-        ? ((overviewForPage.likes + overviewForPage.comments + overviewForPage.shares) /
+        ? ((overviewForPage.likes + overviewForPage.comments + overviewForPage.shares + clicks) /
             overviewForPage.impressions) *
           100
         : 0
