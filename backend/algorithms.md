@@ -13,6 +13,25 @@ If none are present, use 0.
 
 ## Tweet engagement
 
+X engagement rate:
+
+engagement_rate = (total_engagements / impressions) * 100
+
+total_engagements =
+  likes + replies + reposts + link_clicks + profile_clicks + media_clicks + follows_from_post
+
+Current implementation uses available official fields in this codebase:
+
+total_engagements_available = likes + replies + reposts
+
+Follower growth:
+
+follower_growth = current_followers - previous_followers
+
+follower_growth_percent = ((current_followers - previous_followers) / previous_followers) * 100
+
+When previous_followers <= 0, follower_growth_percent = null.
+
 score_legacy = likes + 2 * replies + 2 * retweets + 2 * quotes + bookmarks
 
 weighted_engagement =
