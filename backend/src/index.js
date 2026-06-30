@@ -9,9 +9,11 @@ const connectToDatabase = require('./config/db');
 const Post = require('./models/Post');
 const MetricSnapshot = require('./models/MetricSnapshot');
 const TwitterResearchSnapshot = require('./models/TwitterResearchSnapshot');
+const LinkedInMonthlySnapshot = require('./models/LinkedInMonthlySnapshot');
 const { twitterApiGet } = require('./services/twitterApi');
 const { syncTwitterHistory } = require('./services/twitterSync');
 const { getCryptoTrendAnalysis } = require('./services/twitterResearch');
+const { runLinkedInRetentionJob } = require('./services/linkedinRetention');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -263,6 +265,46 @@ app.post('/api/twitter/sync', async (req, res) => {
 			error: 'Failed to sync Twitter history',
 			details: error.message,
 			upstream: error.upstream || null,
+		});
+	}
+});
+
+app.post('/api/linkedin/retention/run', async (_req, res) => {
+	try {
+		const result = await runLinkedInRetentionJob();
+		return res.json(result);
+	} catch (error) {
+		return res.status(500).json({
+			error: 'LinkedIn retention job failed',
+			details: error.message,
+		});
+	}
+});
+
+app.get('/api/linkedin/monthly-snapshots', async (req, res) => {
+	try {
+		const { postId, year, month } = req.query;
+		const filter = {};
+
+		if (postId) {
+			filter.post = postId;
+		} else {
+			const linkedinPostIds = await Post.distinct('_id', { platform: 'linkedin' });
+			filter.post = { $in: linkedinPostIds };
+		}
+
+		if (year) filter.year = Number(year);
+		if (month) filter.month = Number(month);
+
+		const snapshots = await LinkedInMonthlySnapshot.find(filter)
+			.sort({ year: -1, month: -1 })
+			.lean();
+
+		return res.json(snapshots);
+	} catch (error) {
+		return res.status(500).json({
+			error: 'Failed to fetch LinkedIn monthly snapshots',
+			details: error.message,
 		});
 	}
 });
