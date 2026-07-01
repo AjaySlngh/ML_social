@@ -529,6 +529,23 @@ tr.is-top-post {
   gap: 0.4rem;
 }
 
+.research-topic-opportunities {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.research-topic-opportunity {
+  border: 1px solid #3d4354;
+  border-radius: 0.9rem;
+  padding: 0.8rem;
+  background: rgba(255, 87, 41, 0.08);
+}
+
+:root[data-theme='light'] .research-topic-opportunity {
+  border-color: var(--border);
+  background: rgba(255, 87, 41, 0.12);
+}
+
 .recharts-tooltip-wrapper {
   outline: none;
 }

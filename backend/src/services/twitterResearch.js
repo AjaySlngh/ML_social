@@ -496,6 +496,7 @@ function analyzeTweetsForCryptoTrends(rawTweets, { windowDays = DEFAULT_WINDOW_D
   const topicBreakdown = rankedTopics.map((entry) => ({
     topic: entry.name,
     mentionCount: entry.mentionCount,
+    avgEngagementScore: entry.avgWeightedEngagement,
     weightedMentions: entry.weightedMentions,
     avgWeightedEngagement: entry.avgWeightedEngagement,
     recencyScore: entry.recencyScore,
