@@ -1065,7 +1065,7 @@ function App() {
           </article>
         </section>
 
-        <section className="chart-grid-secondary">
+        <section>
           <article className="panel">
             <div className="panel-title-row">
               <h2>Narrative Opportunities</h2>
