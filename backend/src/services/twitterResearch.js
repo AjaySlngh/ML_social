@@ -216,6 +216,21 @@ function extractTweetText(rawTweet) {
   return String(rawTweet.full_text || rawTweet.text || rawTweet.note_tweet?.text || '').trim();
 }
 
+function isRetweet(rawTweet, text) {
+  if (!rawTweet) {
+    return false;
+  }
+
+  return Boolean(
+    rawTweet.retweeted_tweet ||
+      rawTweet.retweeted_status ||
+      rawTweet.retweetedStatus ||
+      rawTweet.isRetweet ||
+      rawTweet.retweeted ||
+      /^RT\s+@/i.test(String(text || '').trim())
+  );
+}
+
 function extractEngagement(rawTweet) {
   const metrics = rawTweet.public_metrics || rawTweet.metrics || rawTweet.legacy || {};
   const likes = toNumber(metrics.like_count || rawTweet.like_count || rawTweet.likeCount || rawTweet.favorite_count, 0);
@@ -429,6 +444,10 @@ function analyzeTweetsForCryptoTrends(rawTweets, { windowDays = DEFAULT_WINDOW_D
       continue;
     }
 
+    if (isRetweet(rawTweet, text)) {
+      continue;
+    }
+
     const textLower = ` ${text.toLowerCase()} `;
     const hashtags = extractHashtags(text);
     const tokens = tokenize(text);
@@ -457,7 +476,15 @@ function analyzeTweetsForCryptoTrends(rawTweets, { windowDays = DEFAULT_WINDOW_D
     analyzedTweets.push({
       id: String(rawTweet.id_str || rawTweet.id || rawTweet.tweet_id || rawTweet.rest_id || ''),
       text,
-      author: rawTweet.user?.screen_name || rawTweet.user?.username || rawTweet.author?.username || null,
+      author:
+        rawTweet.user?.screen_name ||
+        rawTweet.user?.username ||
+        rawTweet.user?.userName ||
+        rawTweet.author?.username ||
+        rawTweet.author?.userName ||
+        rawTweet.screen_name ||
+        rawTweet.userName ||
+        null,
       publishedAt,
       hashtags,
       topics,
@@ -496,6 +523,7 @@ function analyzeTweetsForCryptoTrends(rawTweets, { windowDays = DEFAULT_WINDOW_D
   const topicBreakdown = rankedTopics.map((entry) => ({
     topic: entry.name,
     mentionCount: entry.mentionCount,
+    avgEngagementScore: entry.avgWeightedEngagement,
     weightedMentions: entry.weightedMentions,
     avgWeightedEngagement: entry.avgWeightedEngagement,
     recencyScore: entry.recencyScore,

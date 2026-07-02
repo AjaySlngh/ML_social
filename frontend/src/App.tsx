@@ -971,8 +971,6 @@ function App() {
 
   const renderResearch = () => {
     const trendRows = researchData?.topicBreakdown ?? []
-    const hashtagRows = researchData?.topHashtags ?? []
-    const keywordRows = researchData?.topKeywords ?? []
     const dailyVolumeRows = researchData?.dailyVolume ?? []
     const engagedTweets = researchData?.mostEngagedTweets ?? []
 
@@ -1067,34 +1065,28 @@ function App() {
           </article>
         </section>
 
-        <section className="chart-grid-secondary">
+        <section>
           <article className="panel">
             <div className="panel-title-row">
-              <h2>Top Hashtags</h2>
-              <span>from list tweets</span>
+              <h2>Narrative Opportunities</h2>
+              <span>topics ranked by momentum + engagement</span>
             </div>
-            <div className="research-chip-list">
-              {hashtagRows.slice(0, 12).map((tag) => (
-                <span key={tag.hashtag} className="research-chip">
-                  #{tag.hashtag} ({formatNumber(tag.count)})
-                </span>
+            <div className="research-topic-opportunities" role="list" aria-label="Top narrative opportunities">
+              {trendRows.slice(0, 8).map((topic, index) => (
+                <article key={topic.topic} className="research-topic-opportunity" role="listitem">
+                  <div className="panel-title-row">
+                    <h2>
+                      #{index + 1} {topic.topic}
+                    </h2>
+                    <span>{topic.trendScore.toFixed(2)} trend score</span>
+                  </div>
+                  <div className="compact-post-stats">
+                    <span>{formatNumber(topic.mentionCount)} mentions</span>
+                    <span>{topic.avgEngagementScore.toFixed(2)} avg engagement score</span>
+                  </div>
+                </article>
               ))}
-              {hashtagRows.length === 0 && <p className="selected-content">No hashtags found in the selected window.</p>}
-            </div>
-          </article>
-
-          <article className="panel">
-            <div className="panel-title-row">
-              <h2>Top Keywords</h2>
-              <span>Ethereum narratives</span>
-            </div>
-            <div className="research-chip-list">
-              {keywordRows.slice(0, 12).map((entry) => (
-                <span key={entry.keyword} className="research-chip">
-                  {entry.keyword} ({formatNumber(entry.count)})
-                </span>
-              ))}
-              {keywordRows.length === 0 && <p className="selected-content">No keywords found in the selected window.</p>}
+              {trendRows.length === 0 && <p className="selected-content">No topic opportunities found in the selected window.</p>}
             </div>
           </article>
         </section>
@@ -1112,6 +1104,9 @@ function App() {
                   <span>{formatDate(tweet.publishedAt)}</span>
                 </div>
                 <p className="selected-content">{tweet.text}</p>
+                <p className="metric-subtext">
+                  Narrative: <strong>{tweet.topics[0] ?? 'Unclassified'}</strong>
+                </p>
                 <div className="compact-post-stats">
                   <span>{formatNumber(tweet.engagement.likes)} likes</span>
                   <span>{formatNumber(tweet.engagement.retweets)} reposts</span>
@@ -1367,19 +1362,20 @@ function App() {
 
   return (
     <main className="app-shell">
+      <button
+        type="button"
+        className="theme-fab"
+        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+        onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+      >
+        <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
+      </button>
+
       <nav className="top-nav" aria-label="Main pages">
         {tabButton('LinkedIn', 'linkedin')}
         {tabButton('X', 'x')}
         {tabButton('Trends', 'research')}
         {tabButton('Insights', 'insights')}
-        <button
-          type="button"
-          className="theme-toggle"
-          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
-        >
-          {theme === 'dark' ? 'Light' : 'Dark'}
-        </button>
       </nav>
 
       {activePage === 'insights' ? renderInsights() : activePage === 'research' ? renderResearch() : renderPlatformPage()}
